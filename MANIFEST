@@ -20,5 +20,6 @@ inc/Module/Install/Makefile.pm
 inc/Module/Install/Metadata.pm
 inc/Module/Install.pm
 META.yml
+SIGNATURE
 t/00.load.t
 t/pod.t
