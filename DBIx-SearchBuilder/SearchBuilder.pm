@@ -1,4 +1,4 @@
-# $Header: /raid/cvsroot/DBIx/DBIx-SearchBuilder/SearchBuilder.pm,v 1.2 2000/08/30 18:46:48 jesse Exp $
+# $Header: /raid/cvsroot/DBIx/DBIx-SearchBuilder/SearchBuilder.pm,v 1.3 2000/09/04 16:25:55 jesse Exp $
 
 # {{{ Version, package, new, etc
 
@@ -171,8 +171,6 @@ sub Limit  {
 	      ALIAS => undef,
 	      TYPE => undef,  #TODO: figure out why this is here
 	      ENTRYAGGREGATOR => 'or',
-	      INT_LINKFIELD => ($self->{'primary_key'} || 'id'),
-	      EXT_LINKFIELD => 'id',
 	      OPERATOR => '=',
 	      ORDERBY => undef,
 	      ORDER => undef,
@@ -266,8 +264,6 @@ sub _GenericRestriction  {
 		ALIAS => undef,	     
 		ENTRYAGGREGATOR => undef,
 		OPERATOR => '=',
-		INT_LINKFIELD => undef,
-		EXT_LINKFIELD => undef,
 		RESTRICTION_TYPE => 'generic', 
 		@_);
     my ($QualifiedField);
@@ -295,17 +291,6 @@ sub _GenericRestriction  {
 	else {
 	    $args{'ALIAS'}=$self->NewAlias($args{'TABLE'})
 	      or warn;
-	    
-	    warn "missing input parameter INT_LINKFIELD"
-	      unless $args{'INT_LINKFIELD'};
-	    warn "missing input parameter EXT_LINKFIELD"
-	      unless $args{'EXT_LINKFIELD'};
-	    
-	    # we need to build the table of links.
-	    $self->Join(ALIAS1 => 'main', 
-			FIELD1 => $args{'INT_LINKFIELD'},
-			ALIAS2 => $args{'ALIAS'},
-			FIELD2 => $args{'EXT_LINKFIELD'});
 	}
 
 	# }}}
@@ -313,10 +298,6 @@ sub _GenericRestriction  {
 
     # }}}
     
-    # If we were just setting an alias, return
-    if (!$args{'FIELD'}) {
-	return ($args{'ALIAS'});
-    }
     
     #Set this to the name of the field and the alias.
     $QualifiedField = $args{'ALIAS'}.".".$args{'FIELD'};
@@ -448,11 +429,19 @@ sub _OrderBy {
 # {{{ routines dealing with table aliases and linking tables
 
 # {{{ sub NewAlias
-sub NewAlias {
-    #TODO Stub
 
+=head2 NewAlias
+
+Takes the name of a table.
+Returns the string of a new Alias for that table
+
+=cut
+
+sub NewAlias {
     my $self = shift;
     my $table = shift || die "Missing parameter";
+    
+    
     my $alias=$table."_".$self->{'alias_count'};
     
     $self->{'aliases'}[$self->{'alias_count'}]{'alias'} = $alias;

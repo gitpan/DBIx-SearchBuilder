@@ -1,4 +1,4 @@
-# $Header: /raid/cvsroot/DBIx/DBIx-SearchBuilder/SearchBuilder/Handle.pm,v 1.2 2000/08/30 18:46:48 jesse Exp $
+# $Header: /raid/cvsroot/DBIx/DBIx-SearchBuilder/SearchBuilder/Handle.pm,v 1.4 2000/09/15 04:57:53 jesse Exp $
 package DBIx::SearchBuilder::Handle;
 use Carp;
 use DBI;
@@ -11,15 +11,50 @@ $VERSION = '0.02';
 
 
 #instantiate a new object.
+
+
+
 # {{{ sub new 
+
 sub new  {
-  my $proto = shift;
-  my $class = ref($proto) || $proto;
-  my $self  = {};
-  bless ($self, $class);
-  #we have no limit statements. DoSearch won't work.
-  return ($self);
-}
+    my $proto = shift;
+    my $class = ref($proto) || $proto;
+    my $self  = {};
+    bless ($self, $class);
+    return $self;
+  }
+
+=head2 new
+
+Takes a single argument. The name of the database driver we want to be using.
+Currently, we support Oracle and mysql (with those capitalizations).
+
+We work a little bit of magic to hand things off to the proper subclass's 
+'new' object. If this is just the wrong way to do things, point me in the 
+right direction, please!
+
+=cut
+
+#if(0) { #Too clever for our own good
+#sub new {
+#    my $class = shift;
+#    my $type = shift;
+#    my ($str, $self);
+#    
+    #We didn't really want the class. we just needed to get the type. lets put it back on the stack.
+#    push @_, $class;
+
+    #Load the right database driver 
+#    require "DBIx::SearchBuilder::Handle::$type";
+
+    #Let's return its creator
+#    eval "return(DBIx::SearchBuilder::Handle::$type->new(\@_));";
+
+
+
+#}
+#}
+
 # }}}
 
 # {{{ sub Connect 
@@ -113,7 +148,6 @@ sub UpdateTableValue  {
 sub SimpleQuery  {
   my $self = shift;
   my $QueryString = shift;
-  # TODO update the last edited 
   
   my $sth = $self->dbh->prepare($QueryString);
   if (!$sth) {

@@ -1,4 +1,4 @@
-#$Header: /raid/cvsroot/DBIx/DBIx-SearchBuilder/SearchBuilder/Record.pm,v 1.2 2000/08/30 18:46:48 jesse Exp $
+#$Header: /raid/cvsroot/DBIx/DBIx-SearchBuilder/SearchBuilder/Record.pm,v 1.4 2000/09/15 04:57:53 jesse Exp $
 package DBIx::SearchBuilder::Record;
 
 use strict;
@@ -145,7 +145,7 @@ sub _Set  {
       } 
       else {
 	  #TODO $self->_Validate($field, $args{'Value'});
-	  $error_condition = $self->_Handle->UpdateTableValue($self->{'table'}, $field,$args{'Value'},$self->id, $args{'IsSQL'});
+	  $error_condition = $self->_Handle->UpdateTableValue($self->Table, $field,$args{'Value'},$self->id, $args{'IsSQL'});
 	  # TODO: Deal with error handling?
 	  $self->{'values'}->{"$field"} = $args{'Value'};
       }
@@ -205,7 +205,7 @@ sub LoadByCol  {
     my $val = shift;
     
     $val = $self->_Handle->safe_quote($val);
-    my $QueryString = "SELECT  * FROM ".$self->{'table'}." WHERE $col = $val";
+    my $QueryString = "SELECT  * FROM ".$self->Table." WHERE $col = $val";
     return ($self->_LoadFromSQL($QueryString));
   }
 
@@ -269,47 +269,7 @@ sub _LoadFromSQL  {
 
 sub Create  {
     my $self = shift;
-    my @keyvalpairs = (@_);
-
-    my ($cols, $vals);
-    
-    
-    while (my $key = shift @keyvalpairs) {
-      my $value = shift @keyvalpairs;
-    
-      $cols .= $key . ", ";
-      if (defined ($value)) {
-	  $value = $self->_Handle->safe_quote($value)
-	      unless ($key=~/^(Created|LastUpdated)$/ && $value=~/^now\(\)$/i);
-	  $vals .= "$value, ";
-      }
-      else {
-	$vals .= "NULL, ";
-      }
-    }	
-    
-    $cols =~ s/, $//;
-    $vals =~ s/, $//;
-    #TODO Check to make sure the key's not already listed.
-    #TODO update internal data structure
-    my $QueryString = "INSERT INTO ".$self->{'table'}." ($cols) VALUES ($vals)";
-
-
-
-
-    my $sth = $self->_Handle->SimpleQuery($QueryString);
-    if (!$sth) {
-       if ($main::debug) {
-	die "Error with $QueryString";
-      }
-       else {
-	 return (0);
-       }
-     }
-
-    #TODO this breaks on databases that aren't mysql
-    $self->{'id'}=$sth->{'mysql_insertid'};
-    return( $self->{'id'}); #Add Succeded. return the id
+    return ($self->_Handle->Insert($self->Table, @_));
   }
 
 # }}}
@@ -321,8 +281,8 @@ sub Delete  {
     
     #TODO Check to make sure the key's not already listed.
     #TODO Update internal data structure
-    my $QueryString = "DELETE FROM ".$self->{'table'} . " WHERE id  = ". $self->id();
-    return($self->_Handle->FetchResult($QueryString));
+    my $QueryString = "DELETE FROM ".$self->Table . " WHERE id  = ". $self->id();
+    return($self->_Handle->SimpleQuery($QueryString));
   }
 
 
@@ -330,10 +290,33 @@ sub Delete  {
 
 # }}}
 
+
+# {{{ sub Table
+
+=head2 Table
+
+Returns or sets the name of the current Table
+
+=cut
+
+sub Table {
+    my $self = shift;
+    if (@_) {
+          $self->{'table'} = shift;
+    }
+    return ($self->{'table'});
+}
+
 # {{{ Routines dealing with database handles
 
 
 # {{{ sub _Handle 
+
+=head2 _Handle
+
+Returns or sets the current DBIx::SearchBuilder::Handle object
+
+=cut
 sub _Handle  {
     my $self = shift;
     if (@_) {
