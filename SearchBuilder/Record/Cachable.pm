@@ -22,16 +22,8 @@ sub new () {
     my ( $class, @args ) = @_;
     my $self = $class->SUPER::new(@args);
 
-    $self->{'_Class'} =
-      ref($self);    # Cache it since we're gonna look at it a _lot_
-
-    if ( $self->can('_CacheConfig') ) {
-        $self->{'_CacheConfig'} = $self->_CacheConfig();
-    }
-    else {
-        $self->{'_CacheConfig'} = __CachableDefaults::_CacheConfig();
-    }
-
+    # Cache it since we're gonna look at it a _lot_
+    $self->{'_Class'} = ref($self);
 
     return ($self);
 }
@@ -40,8 +32,21 @@ sub _SetupCache {
     my $self  = shift;
     my $cache = shift;
     $_CACHES{$cache} = Cache::Simple::TimedExpiry->new();
-    $_CACHES{$cache}->expire_after( $self->{'_CacheConfig'}{'cache_for_sec'} );
+    $_CACHES{$cache}->expire_after( $self->_CacheConfig->{'cache_for_sec'} );
 }
+
+
+=head2 FlushCache 
+
+This class method flushes the _global_ DBIx::SearchBuilder::Record::Cachable 
+cache.  All caches are immediately expired.
+
+=cut
+
+sub FlushCache {
+    %_CACHES = ();
+}
+
 
 sub _KeyCache {
     my $self = shift;
@@ -158,6 +163,7 @@ sub _expire (\$) {
 sub _fetch () {
     my ( $self, $cache_key ) = @_;
     my $data = $self->_RecordCache->fetch($cache_key) or return;
+
     @{$self}{keys %$data} = values %$data; # deserialize
     return 1;
 
@@ -201,7 +207,8 @@ sub _serialize {
 
 sub _gen_alternate_RecordCache_key {
     my ( $self, %attr ) = @_;
-    my $cache_key = $self->Table() . ':';
+    #return( Storable::nfreeze( %attr));
+   my $cache_key;
     while ( my ( $key, $value ) = each %attr ) {
         $key   ||= '__undef';
         $value ||= '__undef';
@@ -225,7 +232,7 @@ sub _gen_alternate_RecordCache_key {
 
 sub _fetch_RecordCache_key {
     my ($self) = @_;
-    my $cache_key = $self->{'_CacheConfig'}{'cache_key'};
+    my $cache_key = $self->_CacheConfig->{'cache_key'};
     return ($cache_key);
 }
 
@@ -280,8 +287,6 @@ sub _lookup_primary_RecordCache_key {
     }
 
 }
-
-package __CachableDefaults;
 
 sub _CacheConfig {
     {
