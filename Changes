@@ -1,8 +1,7 @@
 Revision history for Perl extension DBIx::SearchBuilder.
 
 
-
-1.13
+1.14
     - Silenced warnings about uninitialized warnings when inserting null cols
       into the database.
     - Started adding lowercase method name aliases
@@ -15,7 +14,9 @@ Revision history for Perl extension DBIx::SearchBuilder.
       types in the database as mysql generally does. Additionally, it truncates
       things at utf8 character boundaries...as mysql does not.
     - Fix for an undefined record cache warning on load from Autrijus Tang    
-
+    - Major documentation cleanups --Simon Cavalletto
+    - A few tweaks to the ::Record class to eliminate the              
+      hard-coding of the name of the id column --Simon Cavalletto
 
 1.12
     - Better error handling for some query build failure cases
