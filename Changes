@@ -1,5 +1,20 @@
 Revision history for Perl extension DBIx::SearchBuilder.
 
+0.76 Dec 30 2002
+        - Extra checking for cache misses in DBIx::SearchBuilder::Record::Cachable
+        - The start of support for checking database version, so that we can do 
+          version-specific SQL
+        - A patch from Autrijus Tang that allows utf-8 safe searching
+
+0.75 Dec 06 2002
+        - Applying a patch from Rob Spier <rspier@pobox.com> which enables
+          arbitrarily complex grouping clauses. It's a hack, but we love it 
+          anyway....at least until SB gets redone with proper arbitrarily 
+          complex query generation.
+
+0.74 Oct 11 2002
+        - Adding support for mysqlPP
+
 0.73 Sep 10 2002
         - More class-returnvalue ification
         - Fixed a caching bug that caused multiple copies of an object in memory to not 
