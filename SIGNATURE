@@ -17,9 +17,9 @@ Hash: SHA1
 SHA1 f056b3f270ef68efd6ea0fdaed6c9ef4e54c72dc Changes
 SHA1 e2d0a63f89e91ffcfcb21c8500de4eaef4832517 MANIFEST
 SHA1 8541c8988476422ee38fbc8714c1dd45b212f7fb MANIFEST.SKIP
-SHA1 c0515402246cdc4c587e1e2fe3e280ac672c567b META.yml
+SHA1 de20b3b17b87eb3e30c8afcdf74f7556df4e6288 META.yml
 SHA1 42a7d726a314465af0b0b2249ffee0eba4841274 Makefile.PL
-SHA1 691991ca7e7adeea62454831dc33100be85100b3 SearchBuilder.pm
+SHA1 e6ac1e0edd189edade55e46fc9492b7e24f78102 SearchBuilder.pm
 SHA1 5512f4e1c5e19c39113bae9c347d5e70224e6a2c SearchBuilder/Handle.pm
 SHA1 68a6d7d744e5d123e3c8b59041d12253fcee5d04 SearchBuilder/Handle/Informix.pm
 SHA1 35f764ab7e3c675ffc568f5bcb1ebf921813d801 SearchBuilder/Handle/ODBC.pm
@@ -29,7 +29,7 @@ SHA1 4dfd673981bb75c8f630405c419ece75338dec33 SearchBuilder/Handle/SQLite.pm
 SHA1 cf4420e25ae28aa09fbf5e12643ff43f6a2d9241 SearchBuilder/Handle/mysql.pm
 SHA1 e9716814b99c423b8e3f46c68a86363047b408fd SearchBuilder/Handle/mysqlPP.pm
 SHA1 16d59b02fbe381b0328b2d4403c2cb457d6ecf60 SearchBuilder/Record.pm
-SHA1 86f57530c34c917f921532b8d436edcdfef65295 SearchBuilder/Record/Cachable.pm
+SHA1 518af23156d22246abfcaf579056b5955fda1b33 SearchBuilder/Record/Cachable.pm
 SHA1 98c3ada349cd0f2bdec1f4db090745abbed2db71 inc/Module/Install.pm
 SHA1 7eabc5bd2ae92791a6053f1fdf52bf5ef2a565b0 inc/Module/Install/Base.pm
 SHA1 c35c64a7408e717f5aa8b9bc9d5ff4cc253e83d2 inc/Module/Install/Makefile.pm
@@ -39,7 +39,7 @@ SHA1 c52c9e523059826dba81d4050294e9b70e3410ee test.pl
 Version: GnuPG v1.0.6 (GNU/Linux)
 Comment: For info see http://www.gnupg.org
 
-iEYEARECAAYFAkAtCo4ACgkQQaM/s3DrrJAjmwCffI6fd2XnMqNxoTNGAk4Vkbx1
-I+4AoLPlz6Iuye9WcNLWdxw833wkeTc9
-=/OIs
+iEYEARECAAYFAkA9YTgACgkQQaM/s3DrrJCBMgCgxiA+//ZVZ4lsLyM58wiXIpWa
+3H4AoJAnK50LAX/kq9IBCw7pWClMGx2N
+=DCgk
 -----END PGP SIGNATURE-----
