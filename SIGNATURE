@@ -14,16 +14,16 @@ not run its Makefile.PL or Build.PL.
 -----BEGIN PGP SIGNED MESSAGE-----
 Hash: SHA1
 
-SHA1 a7ace2d26e74f520f8c1fc2d362d06cf7def3fd0 Changes
+SHA1 bec497d88e2e42e641e161db2518cb93cee8e0d1 Changes
 SHA1 e2d0a63f89e91ffcfcb21c8500de4eaef4832517 MANIFEST
 SHA1 8541c8988476422ee38fbc8714c1dd45b212f7fb MANIFEST.SKIP
-SHA1 74655f679709a0083f779946d924aa97f431b6d5 META.yml
+SHA1 aa17086d62b2f40ad4aa7d998bf7d65cf0652603 META.yml
 SHA1 42a7d726a314465af0b0b2249ffee0eba4841274 Makefile.PL
-SHA1 5fea9ceee0fd07a0883f8172aa848e9ec9c13aee SearchBuilder.pm
+SHA1 f85ea89e8dab6c0e794c4bed6dc70c4cd3bffac3 SearchBuilder.pm
 SHA1 5512f4e1c5e19c39113bae9c347d5e70224e6a2c SearchBuilder/Handle.pm
 SHA1 68a6d7d744e5d123e3c8b59041d12253fcee5d04 SearchBuilder/Handle/Informix.pm
 SHA1 35f764ab7e3c675ffc568f5bcb1ebf921813d801 SearchBuilder/Handle/ODBC.pm
-SHA1 b7fd5ef2fcb2f18ff19a6561bfec4122995daa57 SearchBuilder/Handle/Oracle.pm
+SHA1 6f9abc7ece4b28988fa53f45ccafb7bc31454588 SearchBuilder/Handle/Oracle.pm
 SHA1 a4059aa0efde53772ebd209391f5566543c22328 SearchBuilder/Handle/Pg.pm
 SHA1 4dfd673981bb75c8f630405c419ece75338dec33 SearchBuilder/Handle/SQLite.pm
 SHA1 cf4420e25ae28aa09fbf5e12643ff43f6a2d9241 SearchBuilder/Handle/mysql.pm
@@ -39,7 +39,7 @@ SHA1 c52c9e523059826dba81d4050294e9b70e3410ee test.pl
 Version: GnuPG v1.0.6 (GNU/Linux)
 Comment: For info see http://www.gnupg.org
 
-iEYEARECAAYFAj/16PMACgkQQaM/s3DrrJDybgCgmAeocSN2Du4Zl91zCW+pDy4p
-hmEAnjyI1AIpJGggW9yoD6gew6uOJqWd
-=91O2
+iEYEARECAAYFAj/9ptoACgkQQaM/s3DrrJDq0wCfXdz9hrX1Le3hbsXrOEWLHNE6
+hDoAnR8TG4Vr1q2n4pUOfEagDTaqc5v2
+=bplI
 -----END PGP SIGNATURE-----
