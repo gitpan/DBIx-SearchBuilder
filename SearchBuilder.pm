@@ -5,7 +5,7 @@ package DBIx::SearchBuilder;
 use strict;
 use vars qw($VERSION);
 
-$VERSION = "1.11";
+$VERSION = "1.12_01";
 
 =head1 NAME
 
@@ -120,13 +120,13 @@ sub _DoSearch {
         # TODO: finer-grained eval and cheking.
        my  $records = $self->_Handle->SimpleQuery($QueryString);
         my $counter;
+        $self->{'rows'} = 0;
         while ( my $row = $records->fetchrow_hashref() ) {
-            $self->{'items'}[$counter] = $self->NewItem();
-            $self->{'items'}[$counter]->LoadFromHash($row);
-            $counter++;
+            my $item = $self->NewItem();
+            $item->LoadFromHash($row);
+            $self->AddRecord($item);
         }
 
-        $self->{'rows'} = $counter;
         $self->{'must_redo_search'} = 0;
     };
 
@@ -134,6 +134,20 @@ sub _DoSearch {
 }
 
 # }}}
+
+=head2 AddRecord RECORD
+
+    Adds a record object to this collection
+
+=cut
+
+sub AddRecord {
+    my $self = shift;
+    my $record = shift;
+   push @{$self->{'items'}}, $record;
+   $self->{'rows'}++; 
+}
+
 
 # {{{ sub _DoCount
 
