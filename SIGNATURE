@@ -14,12 +14,12 @@ not run its Makefile.PL or Build.PL.
 -----BEGIN PGP SIGNED MESSAGE-----
 Hash: SHA1
 
-SHA1 1af481e10ad20fba13f407daf2fcb165f5876bac Changes
+SHA1 cdcfe8762beecc2efa51d97ebbb9c8d2c42b4c9e Changes
 SHA1 f5a02a65c7d73ceb666d3351cdede865555f5fd4 MANIFEST
 SHA1 8541c8988476422ee38fbc8714c1dd45b212f7fb MANIFEST.SKIP
 SHA1 d85c5711b3a5445b0f478788b0791011d8c6f7ad META.yml
 SHA1 2948c70821e3394e345c1b5e5352abd01219680d Makefile.PL
-SHA1 53b827fe5035df8029f66dba097adad9f9b2192f SearchBuilder.pm
+SHA1 fd5d94a3ba7e72d70f82358ef3bc689b549b40ab SearchBuilder.pm
 SHA1 4a91b3855a941fc5dd5c7e8edd7b50e27820d51f SearchBuilder/Handle.pm
 SHA1 68a6d7d744e5d123e3c8b59041d12253fcee5d04 SearchBuilder/Handle/Informix.pm
 SHA1 35f764ab7e3c675ffc568f5bcb1ebf921813d801 SearchBuilder/Handle/ODBC.pm
@@ -41,7 +41,7 @@ SHA1 e9c6a5881fc60173fbc8d479c1afd2ce3b43bef1 t/pod.t
 -----BEGIN PGP SIGNATURE-----
 Version: GnuPG v1.2.4 (Darwin)
 
-iD8DBQFA0oW5Ei9d9xCOQEYRAiJ0AJ93uVLF/8BpO7tmXFKk/9/DADOk+QCdFkn2
-LIf2hq9lxvRDwx62fS/b9rY=
-=w6Gr
+iD8DBQFA35QvEi9d9xCOQEYRAjCoAJkBvS/Hw0e5LvL3eZxe6TmVKipWwwCfQ+nn
+3sJlaMENnYHN+VwOENq0el0=
+=23t8
 -----END PGP SIGNATURE-----

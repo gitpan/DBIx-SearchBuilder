@@ -1,5 +1,9 @@
 Revision history for Perl extension DBIx::SearchBuilder.
 
+1.01    Sun Jun 27 23:35:46 EDT 2004
+
+        - Releasing 1.00_06 as stable
+
 1.00_06 - Pg/Oracle: Don't attempt to do case insensitive comparisons on
           integer values.
 
