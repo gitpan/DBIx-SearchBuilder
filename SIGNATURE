@@ -14,12 +14,12 @@ not run its Makefile.PL or Build.PL.
 -----BEGIN PGP SIGNED MESSAGE-----
 Hash: SHA1
 
-SHA1 ed87937a3c665efcf58c6e66f840e1d96ab1eb3a Changes
+SHA1 e5940d6d90b042ec302f7d989d0b673b42d2a9b8 Changes
 SHA1 b0ce864348c4270aeba74aa089f052464442e263 MANIFEST
 SHA1 ff5270f1d83d26e8bcf23b283a0b52359ecc611b MANIFEST.SKIP
-SHA1 93c3ffd5e03ad4f0bdfe842a7b556dbc1499d42d META.yml
+SHA1 674659ae871667b219cd09f8930543a0f03772cf META.yml
 SHA1 7d39dfda212a6558dae2123aa958e033c8f310bd Makefile.PL
-SHA1 62e36e92fb70230cbf0fed1a513a09a74d0ec78e SearchBuilder.pm
+SHA1 aa59506616c244c727313aa280d8dbd52b9a7624 SearchBuilder.pm
 SHA1 47e0932f707b28fb6296b72b62ce27817264eded SearchBuilder/Handle.pm
 SHA1 68a6d7d744e5d123e3c8b59041d12253fcee5d04 SearchBuilder/Handle/Informix.pm
 SHA1 35f764ab7e3c675ffc568f5bcb1ebf921813d801 SearchBuilder/Handle/ODBC.pm
@@ -42,7 +42,7 @@ SHA1 71ce3b59b3feeca937fccd3f18c146d8ccbbf6a5 test.pl
 Version: GnuPG v1.0.6 (GNU/Linux)
 Comment: For info see http://www.gnupg.org
 
-iEYEARECAAYFAj+2v1kACgkQQaM/s3DrrJAgKwCg5p3/5b1alK5Yb/vwxrmzOmLo
-bwAAoLiLKuDNV7GhD5tMu2T2cRDNY4xB
-=WTL9
+iEYEARECAAYFAj+6rrQACgkQQaM/s3DrrJCmtQCg5MwLyx5On6iklb/gi8mAmNbY
+sNEAoM0HpKCGw8S177Ypn8mb0sX/9e9O
+=fBtn
 -----END PGP SIGNATURE-----
