@@ -5,7 +5,7 @@ package DBIx::SearchBuilder;
 use strict;
 use vars qw($VERSION);
 
-$VERSION = "1.00_03";
+$VERSION = "1.00_06";
 
 =head1 NAME
 
@@ -313,28 +313,7 @@ Build up all of the joins we need to perform this query
 sub _BuildJoins {
     my $self = shift;
 
-    # if we have a handle specific query builder, let's use that
-    if ( $self->_Handle->can('_BuildJoins') ) {
         return ( $self->_Handle->_BuildJoins($self) );
-    }
-
-    #Otherwise, let's do something generic
-
-    my $join_clause = $self->{'table'} . " main";
-
-    foreach my $join ( keys %{ $self->{'left_joins'} } ) {
-        $join_clause = "( "
-          . $join_clause
-          . $self->{'left_joins'}{$join}{'alias_string'}
-          . " ON  ("
-          . join ( ') AND ( ',
-                   values %{ $self->{'left_joins'}{$join}{'criteria'} } )
-          . "))";
-    }
-    my $aliases = join ( ", ", @{ $self->{'aliases'} } );
-    $join_clause .= ", $aliases" if ($aliases);
-
-    return ($join_clause);
 
 }
 
@@ -650,7 +629,16 @@ sub Limit {
         # we're doing an IS or IS NOT (null), don't quote the operator.
 
         if ( $args{'QUOTEVALUE'} && $args{'OPERATOR'} !~ /IS/ ) {
-            $args{'VALUE'} = $self->_Handle->dbh->quote( $args{'VALUE'} );
+            my $tmp = $self->_Handle->dbh->quote( $args{'VALUE'} );
+
+            # Accomodate DBI drivers that don't understand UTF8
+	    if ($] >= 5.007) {
+	        require Encode;
+	        if( Encode::is_utf8( $args{'VALUE'} ) ) {
+	            Encode::_utf8_on( $tmp );
+	        }
+            }
+	    $args{'VALUE'} = $tmp;
         }
     }
 
@@ -724,6 +712,7 @@ sub _GenericRestriction {
                  OPERATOR        => '=',
                  SUBCLAUSE       => undef,
                  CASESENSITIVE   => undef,
+                 QUOTEVALUE     => undef,
                  @_ );
 
     my ( $Clause, $QualifiedField );
@@ -796,7 +785,7 @@ sub _GenericRestriction {
 
     if ( $self->_Handle->CaseSensitive && defined $args{'VALUE'} && $args{'VALUE'} ne ''  && $args{'VALUE'} ne "''" && ($args{'OPERATOR'} !~/IS/ && $args{'VALUE'} !~ /^null$/i)) {
 
-        unless ( $args{'CASESENSITIVE'} ) {
+        unless ( $args{'CASESENSITIVE'} || !$args{'QUOTEVALUE'} ) {
                ( $QualifiedField, $args{'OPERATOR'}, $args{'VALUE'} ) =
                  $self->_Handle->_MakeClauseCaseInsensitive( $QualifiedField,
                 $args{'OPERATOR'}, $args{'VALUE'} );
