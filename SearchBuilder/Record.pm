@@ -489,23 +489,25 @@ sub AUTOLOAD  {
 
 # }}}
 
-# {{{ sub _Accessible 
+# {{{ sub _Accessible
 
-*_accessible = \&Accessible;
+=head2 _Accessible KEY MODE
+
+Private method.
+
+Returns undef unless C<KEY> is accessible in C<MODE> otherwise returns C<MODE> value
+
+=cut
+
+*_accessible = \&_Accessible;
 sub _Accessible {
     my $self = shift;
     my $attr = shift;
-    my $mode = lc(shift);
+    my $mode = lc(shift || '');
 
-    # @_ is the Accessible data from our subclass. Time to populate
-    # the accessible columns datastructure (but only if we're using
-    # something with the ancient API that predates ClassAccessible
-
-    #  return true if we can $mode $Attrib;
-    local ($^W) = 0;
     my $attribute = $self->_ClassAccessible(@_)->{$attr};
-    return 0 unless (defined $attribute && $attribute->{$mode});
-    return 1;
+    return unless defined $attribute;
+    return $attribute->{$mode};
 }
 
 # }}}
@@ -737,6 +739,18 @@ sub __Set {
 
     $args{'Table'}       = $self->Table();
     $args{'PrimaryKeys'} = { $self->PrimaryKeys() };
+
+    unless ( $self->_Handle->KnowsBLOBs ) {
+        # Support for databases which don't deal with LOBs automatically
+        my $ca = $self->_ClassAccessible();
+        my $key = $args{'Column'};
+            if ( $ca->{$key}->{'type'} =~ /^(text|longtext|clob|blob|lob)$/i ) {
+                my $bhash = $self->_Handle->BLOBParams( $key, $ca->{$key}->{'type'} );
+                $bhash->{'value'} = $args{'Value'};
+                $args{'Value'} = $bhash;
+            }
+        }
+
 
     my $val = $self->_Handle->UpdateRecordValue(%args);
     unless ($val) {
@@ -1141,13 +1155,11 @@ sub Create {
         }
     }
     unless ( $self->_Handle->KnowsBLOBs ) {
-
         # Support for databases which don't deal with LOBs automatically
         my $ca = $self->_ClassAccessible();
         foreach $key ( keys %attribs ) {
             if ( $ca->{$key}->{'type'} =~ /^(text|longtext|clob|blob|lob)$/i ) {
-                my $bhash =
-                  $self->_Handle->BLOBParams( $key, $ca->{$key}->{'type'} );
+                my $bhash = $self->_Handle->BLOBParams( $key, $ca->{$key}->{'type'} );
                 $bhash->{'value'} = $attribs{$key};
                 $attribs{$key} = $bhash;
             }
