@@ -85,7 +85,6 @@ sub Insert {
   my $QueryString =
     "INSERT INTO $table (". join(", ", @cols). ") VALUES ".
     "(". join(", ", @vals). ")";
-    warn $QueryString if $DEBUG;
 
     my $sth =  $self->SimpleQuery($QueryString, @bind);
     return ($sth);
@@ -407,6 +406,7 @@ sub SimpleQuery  {
             $sth->bind_param($bind_idx+1, undef, $bhash );
         }
     }
+    $self->Log($QueryString. " (".join(',',@bind_values).")") if ($DEBUG);
     unless ( $sth->execute(@bind_values) ) {
         if ($DEBUG) {
             die "$self couldn't execute the query '$QueryString'"
@@ -565,7 +565,7 @@ sub _MakeClauseCaseInsensitive {
     $field = "lower($field)";
     $value = lc($value);
 
-    return ($field, $operator, $value);
+    return ($field, $operator, $value,undef);
 }
 
 
@@ -781,6 +781,42 @@ sub DistinctQuery {
 }
 
 # }}}
+
+
+# {{{ DistinctCount
+
+=head2 DistinctCount STATEMENTREF 
+
+takes an incomplete SQL SELECT statement and massages it to return a DISTINCT result set.
+
+
+=cut
+
+sub DistinctCount {
+    my $self = shift;
+    my $statementref = shift;
+
+    # Prepend select query for DBs which allow DISTINCT on all column types.
+    $$statementref = "SELECT COUNT(DISTINCT main.id) FROM $$statementref";
+
+}
+
+# }}}
+
+=head2 Log MESSAGE
+
+Takes a single argument, a message to log.
+
+Currently prints that message to STDERR
+
+=cut
+
+sub Log {
+	my $self = shift;
+	my $msg = shift;
+	warn $msg."\n";
+
+}
 
 
 
