@@ -1,0 +1,111 @@
+# $Header: /raid/cvsroot/DBIx/DBIx-SearchBuilder/SearchBuilder/Handle/Oracle.pm,v 1.6 2000/10/23 22:01:34 jesse Exp $
+
+package DBIx::SearchBuilder::Handle::Oracle;
+use DBIx::SearchBuilder::Handle;
+@ISA = qw(DBIx::SearchBuilder::Handle);
+
+
+
+sub new  {
+      my $proto = shift;
+      my $class = ref($proto) || $proto;
+      my $self  = {};
+      bless ($self, $class);
+      return ($self);
+}
+
+
+=head2 Connect
+
+Connect takes a hashref and passes it off to SUPER::Connect;
+it returns a database handle.
+
+=cut
+  
+sub Connect {
+    my $self = shift;
+    
+    $self->SUPER::Connect(@_);
+    
+    $self->dbh->{LongTruncOk}=1;
+    $self->dbh->{LongReadLen}=8000;
+    
+    $self->SimpleQuery("ALTER SESSION set NLS_DATE_FORMAT = 'YYYY-MM-DD HH24:MI:SS'");
+    
+    return ($Handle); 
+}
+# }}}
+
+# {{{ sub Insert
+
+=head2 Insert
+
+Takes a table name as the first argument and assumes that the rest of the arguments
+are an array of key-value pairs to be inserted.
+
+=cut
+
+sub Insert  {
+	my $self = shift;
+	my $table = shift;
+    my ($sth);
+
+
+
+  # Oracle Hack to replace non-supported mysql_rowid call
+ 
+    $QueryString = "SELECT ".$table."_seq.nextval FROM DUAL";
+ 
+    $sth = $self->SimpleQuery($QueryString);
+    if (!$sth) {
+       if ($main::debug) {
+    	die "Error with $QueryString";
+      }
+       else {
+	 return (undef);
+       }
+     }
+
+     #needs error checking
+    my @row = $sth->fetchrow_array;
+
+    my $unique_id = $row[0];
+
+    #TODO: don't hardcode this to id pull it from somewhere else
+    #call super::Insert with the new column id.
+
+   $sth =  $self->SUPER::Insert( $table, 'id', $unique_id, @_);
+
+   unless ($sth) {
+     if ($main::debug) {
+        die "Error with $QueryString: ". $self->dbh->errstr;
+    }
+     else {
+         return (undef);
+     }
+   }
+
+    $self->{'id'} = $unique_id;
+    return( $self->{'id'}); #Add Succeded. return the id
+  }
+
+
+
+=head1 NAME
+
+  DBIx::SearchBuilder::Handle::Oracle -- an oracle specific Handle object
+
+=head1 SYNOPSIS
+
+
+  =head1 DESCRIPTION
+
+=head1 AUTHOR
+
+Jesse Vincent, jesse@fsck.com
+
+=head1 SEE ALSO
+
+perl(1), DBIx::SearchBuilder
+
+=cut
