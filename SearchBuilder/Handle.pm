@@ -3,8 +3,10 @@ package DBIx::SearchBuilder::Handle;
 use Carp;
 use DBI;
 use strict;
-use vars qw($VERSION @ISA $DBIHandle $DEBUG);
+use Class::ReturnValue;
+use vars qw($VERSION @ISA $DBIHandle $DEBUG $TRANSCOUNT);
 
+$TRANSCOUNT = 0;
 
 $VERSION = '$Version$';
 
@@ -148,10 +150,10 @@ sub BuildDSN {
   
   
   my $dsn = "dbi:$args{'Driver'}:dbname=$args{'Database'}";
-  $dsn .= ";sid=$args{'SID'}" if ( defined $args{'SID'});
-  $dsn .= ";host=$args{'Host'}" if (defined$args{'Host'});
-  $dsn .= ";port=$args{'Port'}" if (defined $args{'Port'});
-  $dsn .= ";requiressl=1" if (defined $args{'RequireSSL'});
+  $dsn .= ";sid=$args{'SID'}" if ( defined $args{'SID'} && $args{'SID'});
+  $dsn .= ";host=$args{'Host'}" if (defined$args{'Host'} && $args{'Host'});
+  $dsn .= ";port=$args{'Port'}" if (defined $args{'Port'} && $args{'Port'});
+  $dsn .= ";requiressl=1" if (defined $args{'RequireSSL'} && $args{'RequireSSL'});
 
   $self->{'dsn'}= $dsn;
 }
@@ -269,26 +271,31 @@ sub dbh {
 
 # }}}
 
-# {{{ sub UpdateTableValue 
+# {{{ sub UpdateRecordValue 
 
 =head2 UpdateRecordValue 
 
 Takes a hash with fields: Table, Column, Value PrimaryKeys, and 
-IsSqlFunction.  Table, and Column should be obvious, Value is where you 
+IsSQLFunction.  Table, and Column should be obvious, Value is where you 
 set the new value you want the column to have. The primary_keys field should 
 be the lvalue of DBIx::SearchBuilder::Record::PrimaryKeys().  Finally 
-sql_function_p is set when the Value is a SQL function.  For example, you 
-might have ('Value'=>'PASSWORD(string)'), by setting sql_function_p that 
+IsSQLFunction is set when the Value is a SQL function.  For example, you 
+might have ('Value'=>'PASSWORD(string)'), by setting IsSQLFunction that 
 string will be inserted into the query directly rather then as a binding. 
 
 =cut
 
+## Please see file perltidy.ERR
 sub UpdateRecordValue {
-  my $self = shift;
-  my %args = @_;
+    my $self = shift;
+    my %args = ( Table         => undef,
+                 Column        => undef,
+                 IsSQLFunction => undef,
+                 PrimaryKeys   => undef,
+                 @_ );
 
-  my @bind   = ();
-  my $query  = 'UPDATE ' . $args{'Table'}  . ' ';
+    my @bind  = ();
+    my $query = 'UPDATE ' . $args{'Table'} . ' ';
      $query .= 'SET '    . $args{'Column'} . '=';
 
   ## Look and see if the field is being updated via a SQL function. 
@@ -359,21 +366,31 @@ sub SimpleQuery  {
 	else {
 	    warn "$self couldn't prepare the query '$QueryString'" . 
 	      $self->dbh->errstr . "\n";
-	    return (undef);
+        my $ret = Class::ReturnValue->new();
+        $ret->as_error( errno => '-1',
+                            message => "Couldn't prepare the query '$QueryString'.". $self->dbh->errstr,
+                            do_backtrace => undef);
+	    return ($ret->return_value);
 	}
     }
-    unless ($sth->execute(@bind_values)) {
-	if ($DEBUG) {
-	    die "$self couldn't execute the query '$QueryString'" . 
-	      $self->dbh->errstr . "\n";
-	    
-	}
-	else {
-	    warn "$self couldn't execute the query '$QueryString'" . 
-	      $self->dbh->errstr . "\n";
-	    return(undef);
-	}
-	
+    unless ( $sth->execute(@bind_values) ) {
+        if ($DEBUG) {
+            die "$self couldn't execute the query '$QueryString'"
+              . $self->dbh->errstr . "\n";
+
+        }
+        else {
+            warn "$self couldn't execute the query '$QueryString'";
+
+              my $ret = Class::ReturnValue->new();
+            $ret->as_error(
+                         errno   => '-1',
+                         message => "Couldn't execute the query '$QueryString'"
+                           . $self->dbh->errstr,
+                         do_backtrace => undef );
+            return ($ret->return_value);
+        }
+
     }
     return ($sth);
     
@@ -387,7 +404,9 @@ sub SimpleQuery  {
 =head2 FetchResult QUERY, [ BIND_VALUE, ... ]
 
 Takes a SELECT query as a string, along with an array of BIND_VALUEs
-Returns the first row as an array
+If the select succeeds, returns the first row as an array.
+Otherwise, returns a Class::ResturnValue object with the failure loaded
+up.
 
 =cut 
 
@@ -396,8 +415,12 @@ sub FetchResult {
   my $query = shift;
   my @bind_values = @_;
   my $sth = $self->SimpleQuery($query, @bind_values);
-  
-  return ($sth->fetchrow);
+  if ($sth) {
+    return ($sth->fetchrow);
+  }
+  else {
+   return($sth);
+  }
 }
 # }}}
 
@@ -444,11 +467,18 @@ sub CaseSensitive {
 Tells DBIx::SearchBuilder to begin a new SQL transaction. This will
 temporarily suspend Autocommit mode.
 
+Emulates nested transactions, by keeping a transaction stack depth.
+
 =cut
 
 sub BeginTransaction {
     my $self = shift;
-    return($self->SimpleQuery('BEGIN'));
+    $TRANSCOUNT++;
+    if ($TRANSCOUNT > 1 ) {
+        return ($TRANSCOUNT);
+    } else {
+        return($self->dbh->begin_work);
+    }
 }
 
 # }}}
@@ -464,7 +494,14 @@ This will turn Autocommit mode back on.
 
 sub Commit {
     my $self = shift;
-    return($self->SimpleQuery('COMMIT'));
+    unless ($TRANSCOUNT) {Carp::confess("Attempted to commit a transaction with none in progress")};
+    $TRANSCOUNT--;
+
+    if ($TRANSCOUNT == 0 ) {
+        return($self->dbh->commit);
+    } else { #we're inside a transaction
+        return($TRANSCOUNT);
+    }
 }
 
 # }}}
@@ -480,7 +517,14 @@ This will turn Autocommit mode back on.
 
 sub Rollback {
     my $self = shift;
-    return($self->SimpleQuery('ROLLBACK'));
+    unless ($TRANSCOUNT) {Carp::confess("Attempted to rollback a transaction with none in progress")};
+    $TRANSCOUNT--;
+
+    if ($TRANSCOUNT == 0 ) {
+        return($self->dbh->rollback);
+    } else { #we're inside a transaction
+        return($TRANSCOUNT);
+    }
 }
 
 # }}}
