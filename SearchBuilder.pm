@@ -5,7 +5,7 @@ package DBIx::SearchBuilder;
 use strict;
 use vars qw($VERSION);
 
-$VERSION = "1.00_01";
+$VERSION = "1.00_03";
 
 =head1 NAME
 
@@ -1149,10 +1149,11 @@ sub GotoPage {
     my $self = shift;
     my $page = shift;
 
-    unless ( $self->RowsPerPage ) {
+    if ( $self->RowsPerPage ) {
+    	$self->FirstRow( 1 + ( $self->RowsPerPage * $page ) );
+    } else {
         $self->FirstRow(1);
     }
-    $self->FirstRow( 1 + ( $self->RowsPerPage * $page ) );
 }
 
 # }}}
