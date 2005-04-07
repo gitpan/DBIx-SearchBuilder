@@ -5,7 +5,7 @@ package DBIx::SearchBuilder;
 use strict;
 use vars qw($VERSION);
 
-$VERSION = "1.22";
+$VERSION = "1.24";
 
 =head1 NAME
 
@@ -1055,7 +1055,7 @@ sub _OrderClause {
 
 # {{{ GroupBy (OBSOLETE)
 
-=head2 GroupBy
+=head2 GroupBy  (DEPRECATED)
 
 Alias for the GroupByCols method.
 
