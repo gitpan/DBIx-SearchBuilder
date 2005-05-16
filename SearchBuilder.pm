@@ -5,7 +5,7 @@ package DBIx::SearchBuilder;
 use strict;
 use vars qw($VERSION);
 
-$VERSION = "1.27";
+$VERSION = "1.30_01";
 
 =head1 NAME
 
@@ -30,6 +30,11 @@ DBIx::SearchBuilder - Encapsulate SQL queries and rows in simple perl objects
 =head1 DESCRIPTION
 
 This module provides an object-oriented mechanism for retrieving and updating data in a DBI-accesible database. 
+
+=head1 METHOD NAMING
+ 
+Each method has a lower case alias; '_' is used to separate words.
+For example, the method C<RedoSearch> has the alias C<redo_search>.
 
 =head1 METHODS
 
@@ -397,7 +402,7 @@ such that the following call to Next will start over with the first item retriev
 
 =cut
 
-*next = \&Next;
+
 
 sub Next {
     my $self = shift;
@@ -430,7 +435,7 @@ through the result set.
 
 =cut
 
-*goto_first_item = \&GotoFirstItem;
+
 sub GotoFirstItem {
     my $self = shift;
     $self->GotoItem(0);
@@ -1345,7 +1350,7 @@ Returns the number of records in the set.
 =cut
 
 
-*count = \&Count;
+
 sub Count {
     my $self = shift;
 
@@ -1615,7 +1620,9 @@ sub Table {
 
 
 # }}}
-
+if( eval { require capitalization } ) {
+	capitalization->unimport( __PACKAGE__ );
+}
 
 1;
 __END__
