@@ -6,102 +6,153 @@ use warnings;
 use File::Spec;
 use Test::More;
 BEGIN { require "t/utils.pl" }
+our (@AvailableDrivers);
 
-eval "use DBD::SQLite";
-if ($@) { 
-plan skip_all => "DBD::SQLite required for testing database interaction" 
-} else{
-plan tests => 30;
-}
+use constant TESTS_PER_DRIVER => 44;
 
-my $handle = get_handle('SQLite');
-$handle->Connect( Driver => 'SQLite', Database => File::Spec->catfile(File::Spec->tmpdir(), "sb-test.$$"));
-isa_ok($handle->dbh, 'DBI::db');
+my $total = scalar(@AvailableDrivers) * TESTS_PER_DRIVER;
+plan tests => $total;
 
-my $ret = $handle->SimpleQuery(TestApp::Address->schema);
-isa_ok($ret,'DBI::st', "Inserted the schema. got a statement handle back");
+foreach my $d ( @AvailableDrivers ) {
+SKIP: {
+	unless( has_schema( 'TestApp::Address', $d ) ) {
+		skip "No schema for '$d' driver", TESTS_PER_DRIVER;
+	}
+	unless( should_test( $d ) ) {
+		skip "ENV is not defined for driver '$d'", TESTS_PER_DRIVER;
+	}
 
+	my $handle = get_handle( $d );
+	connect_handle( $handle );
+	isa_ok($handle->dbh, 'DBI::db');
 
-my $rec = TestApp::Address->new($handle);
-isa_ok($rec, 'DBIx::SearchBuilder::Record');
+	my $ret = init_schema( 'TestApp::Address', $handle );
+	isa_ok($ret,'DBI::st', "Inserted the schema. got a statement handle back");
+
+	my $rec = TestApp::Address->new($handle);
+	isa_ok($rec, 'DBIx::SearchBuilder::Record');
 
 # _Accessible testings
-is( $rec->_Accessible('id' => 'read'), 1, 'id is accessible for read' );
-is( $rec->_Accessible('id' => 'write'), undef, 'id is not accessible for write' );
-is( $rec->_Accessible('unexpected_field' => 'read'), undef, "field doesn't exist and can't be accessible for read" );
+	is( $rec->_Accessible('id' => 'read'), 1, 'id is accessible for read' );
+	is( $rec->_Accessible('id' => 'write'), undef, 'id is not accessible for write' );
+	is( $rec->_Accessible('id'), undef, "any field is not accessible in undefined mode" );
+	is( $rec->_Accessible('unexpected_field' => 'read'), undef, "field doesn't exist and can't be accessible for read" );
+	is_deeply( [sort($rec->ReadableAttributes)], [qw(EmployeeId Name Phone id)], 'readable attributes' );
+	is_deeply( [sort($rec->WritableAttributes)], [qw(EmployeeId Name Phone)], 'writable attributes' );
 
-can_ok($rec,'Create');
+	can_ok($rec,'Create');
 
-my ($id) = $rec->Create( Name => 'Jesse', Phone => '617 124 567');
-ok($id,"Created record ". $id);
-ok($rec->Load($id), "Loaded the record");
+	my ($id) = $rec->Create( Name => 'Jesse', Phone => '617 124 567');
+	ok($id,"Created record ". $id);
+	ok($rec->Load($id), "Loaded the record");
 
 
-is($rec->id, $id, "The record has its id");
-is ($rec->Name, 'Jesse', "The record's name is Jesse");
+	is($rec->id, $id, "The record has its id");
+	is ($rec->Name, 'Jesse', "The record's name is Jesse");
 
-my ($val, $msg) = $rec->SetName('Obra');
-ok($val, $msg) ;
-is($rec->Name, 'Obra', "We did actually change the name");
+	my ($val, $msg) = $rec->SetName('Obra');
+	ok($val, $msg) ;
+	is($rec->Name, 'Obra', "We did actually change the name");
 
 # Validate immutability of the field id
-($val, $msg) = $rec->Setid( $rec->id + 1 );
-ok(!$val, $msg);
-is($msg, 'Immutable field', 'id is immutable field');
-is($rec->id, $id, "The record still has its id");
+	($val, $msg) = $rec->Setid( $rec->id + 1 );
+	ok(!$val, $msg);
+	is($msg, 'Immutable field', 'id is immutable field');
+	is($rec->id, $id, "The record still has its id");
 
 # Check some non existant field
-ok( !eval{ $rec->SomeUnexpectedField }, "The record has no 'SomeUnexpectedField'");
-{
-	# test produce DBI warning
-	local $SIG{__WARN__} = sub {return};
-	is( $rec->_Value( 'SomeUnexpectedField' ), undef, "The record has no 'SomeUnexpectedField'");
-}
-($val, $msg) = $rec->SetSomeUnexpectedField( 'foo' );
-ok(!$val, $msg);
-is($msg, 'Nonexistant field?', "Field doesn't exist");
-($val, $msg) = $rec->_Set('SomeUnexpectedField', 'foo');
-ok(!$val, "$msg");
+	ok( !eval{ $rec->SomeUnexpectedField }, "The record has no 'SomeUnexpectedField'");
+	{
+		# test produce DBI warning
+		local $SIG{__WARN__} = sub {return};
+		is( $rec->_Value( 'SomeUnexpectedField' ), undef, "The record has no 'SomeUnexpectedField'");
+	}
+	($val, $msg) = $rec->SetSomeUnexpectedField( 'foo' );
+	ok(!$val, $msg);
+	is($msg, 'Nonexistant field?', "Field doesn't exist");
+	($val, $msg) = $rec->_Set('SomeUnexpectedField', 'foo');
+	ok(!$val, "$msg");
 
 
 # Validate truncation on update
 
-($val,$msg) = $rec->SetName('1234567890123456789012345678901234567890');
+	($val,$msg) = $rec->SetName('1234567890123456789012345678901234567890');
 
-ok($val, $msg) ;
+	ok($val, $msg) ;
 
-is($rec->Name, '12345678901234', "Truncated on update");
+	is($rec->Name, '12345678901234', "Truncated on update");
 
 
 
 # Test unicode truncation:
-my $univalue = "這是個測試";
+	my $univalue = "這是個測試";
 
-($val,$msg) = $rec->SetName($univalue.$univalue);
+	($val,$msg) = $rec->SetName($univalue.$univalue);
 
-ok($val, $msg) ;
+	ok($val, $msg) ;
 
-is($rec->Name, '這是個測');
+	is($rec->Name, '這是個測');
 
 
 
 # make sure we do _not_ truncate things which should not be truncated
-($val,$msg) = $rec->SetEmployeeId('1234567890');
+	($val,$msg) = $rec->SetEmployeeId('1234567890');
 
-ok($val, $msg) ;
+	ok($val, $msg) ;
 
-is($rec->EmployeeId, '1234567890', "Did not truncate id on create");
+	is($rec->EmployeeId, '1234567890', "Did not truncate id on create");
 
 # make sure we do truncation on create
-my $newrec = TestApp::Address->new($handle);
-my $newid = $newrec->Create( Name => '1234567890123456789012345678901234567890',
-                             EmployeeId => '1234567890' );
+	my $newrec = TestApp::Address->new($handle);
+	my $newid = $newrec->Create( Name => '1234567890123456789012345678901234567890',
+	                             EmployeeId => '1234567890' );
 
-$newrec->Load($newid);
+	$newrec->Load($newid);
 
-ok ($newid, "Created a new record");
-is($newrec->Name, '12345678901234', "Truncated on create");
-is($newrec->EmployeeId, '1234567890', "Did not truncate id on create");
+	ok ($newid, "Created a new record");
+	is($newrec->Name, '12345678901234', "Truncated on create");
+	is($newrec->EmployeeId, '1234567890', "Did not truncate id on create");
+
+# no prefetch feature and _LoadFromSQL sub checks
+	$newrec = TestApp::Address->new($handle);
+	($val, $msg) = $newrec->_LoadFromSQL('SELECT id FROM Address WHERE id = ?', $newid);
+	is($val, 1, 'found object');
+	is($newrec->Name, '12345678901234', "autoloaded not prefetched field");
+	is($newrec->EmployeeId, '1234567890', "autoloaded not prefetched field");
+
+# _LoadFromSQL and missing PK
+	$newrec = TestApp::Address->new($handle);
+	($val, $msg) = $newrec->_LoadFromSQL('SELECT Name FROM Address WHERE Name = ?', '12345678901234');
+	is($val, 0, "didn't find object");
+	is($msg, "Missing a primary key?", "reason is missing PK");
+
+# _LoadFromSQL and not existant row
+	$newrec = TestApp::Address->new($handle);
+	($val, $msg) = $newrec->_LoadFromSQL('SELECT id FROM Address WHERE id = ?', 0);
+	is($val, 0, "didn't find object");
+	is($msg, "Couldn't find row", "reason is wrong id");
+
+# _LoadFromSQL and wrong SQL
+	$newrec = TestApp::Address->new($handle);
+	{
+		local $SIG{__WARN__} = sub{return};
+		($val, $msg) = $newrec->_LoadFromSQL('SELECT ...');
+	}
+	is($val, 0, "didn't find object");
+	is($msg, "Couldn't execute query", "reason is bad SQL");
+
+# deletes
+	$newrec = TestApp::Address->new($handle);
+	$newrec->Load( $newid );
+	is( $newrec->Delete, 1, 'successfuly delete record');
+	$newrec = TestApp::Address->new($handle);
+	$newrec->Load( $newid );
+	is( $newrec->id, undef, "record doesn't exist any more");
+
+	cleanup_schema( 'TestApp::Address', $handle );
+}} # SKIP, foreach blocks
+
+1;
 
 
 
@@ -133,8 +184,19 @@ sub _ClassAccessible {
 
 }
 
+sub schema_mysql {
+<<EOF;
+CREATE TEMPORARY TABLE Address (
+        id integer AUTO_INCREMENT,
+        Name varchar(36),
+        Phone varchar(18),
+        EmployeeId int(8),
+  	PRIMARY KEY (id))
+EOF
 
-sub schema {
+}
+
+sub schema_sqlite {
 
 <<EOF;
 CREATE TABLE Address (

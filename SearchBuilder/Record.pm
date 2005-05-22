@@ -419,16 +419,14 @@ sub DESTROY {
 # {{{ sub AUTOLOAD 
 
 sub AUTOLOAD {
-    my $self = shift;
+    my $self = $_[0];
 
     no strict 'refs';
-    my $Attrib;
-    if ( $AUTOLOAD =~ /.*::(\w+)/o ) {
-        $Attrib = $1;
-    } 
-    if ( $Attrib &&  $self->_Accessible( $Attrib, 'read' ) ) {
+    my ($Attrib) = ( $AUTOLOAD =~ /::(\w+)$/o );
+
+    if ( $self->_Accessible( $Attrib, 'read' ) ) {
         *{$AUTOLOAD} = sub { return ( $_[0]->_Value($Attrib) ) };
-        return ( $self->_Value($Attrib) );
+	goto &$AUTOLOAD;
     }
     elsif ( $AUTOLOAD =~ /.*::[sS]et_?(\w+)/o ) {
             $Attrib = $1;
@@ -438,16 +436,12 @@ sub AUTOLOAD {
             *{$AUTOLOAD} = sub {
                 return ( $_[0]->_Set( Field => $Attrib, Value => $_[1] ) );
             };
-
-            my $Value = shift @_;
-            return ( $self->_Set( Field => $Attrib, Value => $Value ) );
+	    goto &$AUTOLOAD;
         }
 
         elsif ( $self->_Accessible( $Attrib, 'read' ) ) {
-            *{$AUTOLOAD} = sub {
-                return ( 0, 'Immutable field' );
-            };
-            return ( 0, 'Immutable field' );
+            *{$AUTOLOAD} = sub { return ( 0, 'Immutable field' ) };
+	    goto &$AUTOLOAD;
         }
         else {
             return ( 0, 'Nonexistant field?' );
@@ -457,13 +451,12 @@ sub AUTOLOAD {
         $Attrib = $1;
         if ( $self->_Accessible( $Attrib, 'object' ) ) {
             *{$AUTOLOAD} = sub {
-                my $s = shift;
-                return $s->_Object(
+                return (shift)->_Object(
                     Field => $Attrib,
                     Args  => [@_],
                 );
             };
-            return $self->_Object( Field => $Attrib, Args => [@_] );
+	    goto &$AUTOLOAD;
         }
         else {
             return ( 0, 'No object mapping for field' );
@@ -478,8 +471,7 @@ sub AUTOLOAD {
         $Attrib = $1;
 
         *{$AUTOLOAD} = sub { return ( $_[0]->_Validate( $Attrib, $_[1] ) ) };
-        my $Value = shift @_;
-        return ( $self->_Validate( $Attrib, $Value ) );
+	goto &$AUTOLOAD;
     }
 
     # TODO: if autoload = 0 or 1 _ then a combination of lowercase and _ chars,
@@ -1104,30 +1096,27 @@ sub _LoadFromSQL {
 
     #TODO this only gets the first row. we should check if there are more.
 
-    unless ($sth) {
-        return($sth);
-    }
+    return ( 0, "Couldn't execute query" ) unless $sth;
 
-    eval { $self->{'values'} = $sth->fetchrow_hashref; };
-    if ($@) {
-        warn $@;
+    $self->{'values'} = $sth->fetchrow_hashref;
+    $self->{'fetched'} = {};
+    if ( !$self->{'values'} && $sth->err ) {
+        return ( 0, "Couldn't fetch row: ". $sth->err );
     }
 
     unless ( $self->{'values'} ) {
         return ( 0, "Couldn't find row" );
     }
 
-    
-    foreach my $f ( keys %{$self->{'values'}||{}} ) {
-        $self->{'fetched'}{lc $f} = 1;
-    }
-
     ## I guess to be consistant with the old code, make sure the primary  
     ## keys exist.
 
-    eval { $self->PrimaryKeys(); };
-    if ($@) {
-        return ( 0, "Missing a primary key?: $@" );
+    if( grep { not defined } $self->PrimaryKeys ) {
+        return ( 0, "Missing a primary key?" );
+    }
+    
+    foreach my $f ( keys %{$self->{'values'}} ) {
+        $self->{'fetched'}{lc $f} = 1;
     }
     return ( 1, "Found Object" );
 
