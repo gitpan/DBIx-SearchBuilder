@@ -8,7 +8,6 @@ use vars qw($AUTOLOAD);
 use Class::ReturnValue;
 
 
-
 # {{{ Doc
 
 =head1 NAME
@@ -356,7 +355,6 @@ Instantiate a new record object.
 =cut
 
 
-
 sub new  {
     my $proto = shift;
    
@@ -369,6 +367,13 @@ sub new  {
   }
 
 # }}}
+
+# Not yet documented here.  Should almost certainly be overloaded.
+sub _Init {
+    my $self = shift;
+    my $handle = shift;
+    $self->_Handle($handle);
+}
 
 # {{{ sub Id and id
 
@@ -384,7 +389,8 @@ Returns this row's primary key.
 
 sub Id  {
     my $pkey = $_[0]->_PrimaryKey();
-    $_[0]->{'values'}->{$pkey};
+    my $ret = $_[0]->{'values'}->{$pkey};
+    return $ret;
 }
 
 # }}}
@@ -426,22 +432,37 @@ sub AUTOLOAD {
 
     if ( $self->_Accessible( $Attrib, 'read' ) ) {
         *{$AUTOLOAD} = sub { return ( $_[0]->_Value($Attrib) ) };
-	goto &$AUTOLOAD;
+        goto &$AUTOLOAD;
+    }
+    elsif ( $self->_Accessible( $Attrib, 'record-read') ) {
+        *{$AUTOLOAD} = sub { $_[0]->_ToRecord( $Attrib, $_[0]->_Value($Attrib) ) };
+        goto &$AUTOLOAD;        
+    }
+    elsif ( $self->_Accessible( $Attrib, 'foreign-collection') ) {
+        *{$AUTOLOAD} = sub { $_[0]->_CollectionValue( $Attrib ) };
+        goto &$AUTOLOAD;
     }
     elsif ( $AUTOLOAD =~ /.*::[sS]et_?(\w+)/o ) {
-            $Attrib = $1;
+        $Attrib = $1;
 
         if ( $self->_Accessible( $Attrib, 'write' ) ) {
-
             *{$AUTOLOAD} = sub {
                 return ( $_[0]->_Set( Field => $Attrib, Value => $_[1] ) );
             };
-	    goto &$AUTOLOAD;
-        }
+            goto &$AUTOLOAD;
+        } elsif ( $self->_Accessible( $Attrib, 'record-write') ) {
+            *{$AUTOLOAD} = sub {
+                my $self = shift;
+                my $val = shift;
 
+                $val = $val->id if UNIVERSAL::isa($val, 'DBIx::SearchBuilder::Record');
+                return ( $self->_Set( Field => $Attrib, Value => $val ) );
+            };
+            goto &$AUTOLOAD;            
+        }
         elsif ( $self->_Accessible( $Attrib, 'read' ) ) {
             *{$AUTOLOAD} = sub { return ( 0, 'Immutable field' ) };
-	    goto &$AUTOLOAD;
+            goto &$AUTOLOAD;
         }
         else {
             return ( 0, 'Nonexistant field?' );
@@ -456,7 +477,7 @@ sub AUTOLOAD {
                     Args  => [@_],
                 );
             };
-	    goto &$AUTOLOAD;
+            goto &$AUTOLOAD;
         }
         else {
             return ( 0, 'No object mapping for field' );
@@ -471,7 +492,7 @@ sub AUTOLOAD {
         $Attrib = $1;
 
         *{$AUTOLOAD} = sub { return ( $_[0]->_Validate( $Attrib, $_[1] ) ) };
-	goto &$AUTOLOAD;
+        goto &$AUTOLOAD;
     }
 
     # TODO: if autoload = 0 or 1 _ then a combination of lowercase and _ chars,
@@ -536,8 +557,10 @@ sub _PrimaryKey {
 
 =head2 _ClassAccessible 
 
-Preferred and most efficient way to specify fields attributes in a derived
-class. 
+An older way to specify fields attributes in a derived class.
+(The current preferred method is by overriding C<Schema>; if you do
+this and don't override C<_ClassAccessible>, the module will generate
+an appropriate C<_ClassAccessible> based on your C<Schema>.)
 
 Here's an example declaration:
 
@@ -551,11 +574,15 @@ Here's an example declaration:
 
 =cut
 
-# XXX This is stub code to deal with the old way we used to do _Accessible
-# It should never be called by modern code
 
 sub _ClassAccessible {
   my $self = shift;
+  
+  return $self->_ClassAccessibleFromSchema if $self->can('Schema');
+  
+  # XXX This is stub code to deal with the old way we used to do _Accessible
+  # It should never be called by modern code
+  
   my %accessible;
   while ( my $col = shift ) {
     $accessible{$col}->{lc($_)} = 1
@@ -564,7 +591,79 @@ sub _ClassAccessible {
   return(\%accessible);
 }
 
+sub _ClassAccessibleFromSchema {
+  my $self = shift;
+  
+  my $accessible = {
+    # XXX TODO FIXME: should fetch custom primary key name
+    'id' => { 'read' => 1 },
+  };
+  
+  my $schema = $self->Schema;
+  
+  for my $field (keys %$schema) {
+    if ($schema->{$field}{'TYPE'}) {
+        $accessible->{$field} = { 'read' => 1, 'write' => 1 };
+    } elsif (my $refclass = $schema->{$field}{'REFERENCES'}) {
+        if (UNIVERSAL::isa($refclass, 'DBIx::SearchBuilder::Record')) {
+            $accessible->{$field} = { 'record-read' => 1, 'record-write' => 1 };
+        } elsif (UNIVERSAL::isa($refclass, 'DBIx::SearchBuilder')) {
+            $accessible->{$field} = { 'foreign-collection' => 1 };
+        } else {
+            warn "Error: $refclass neither Record nor Collection";
+        }
+    }
+  }
+  
+  return $accessible;  
+}
+
 # }}}
+
+sub _ToRecord {
+    my $self = shift;
+    my $field = shift;
+    my $value = shift;
+
+    return unless defined $value;
+    
+    my $schema = $self->Schema;
+    my $description = $schema->{$field};
+    
+    return unless $description;
+    
+    return $value unless $description->{'REFERENCES'};
+    
+    my $classname = $description->{'REFERENCES'};
+
+    return unless UNIVERSAL::isa($classname, 'DBIx::SearchBuilder::Record');
+    
+    # XXX TODO FIXME perhaps this is not what should be passed to new, but it needs it
+    my $object = $classname->new( $self->_Handle );
+    $object->LoadById( $value );
+    return $object;
+}
+
+sub _CollectionValue {
+    my $self = shift;
+    
+    my $method_name =  shift;
+    return unless defined $method_name;
+    
+    my $schema = $self->Schema;
+    my $description = $schema->{$method_name};
+    return unless $description;
+    
+    my $classname = $description->{'REFERENCES'};
+
+    return unless UNIVERSAL::isa($classname, 'DBIx::SearchBuilder');
+    
+    my $coll = $classname->new( Handle => $self->_Handle );
+    
+    $coll->Limit( FIELD => $description->{'KEY'}, VALUE => $self->id);
+    
+    return $coll;
+}
 
 # sub {{{ ReadableAttributes
 
@@ -614,7 +713,7 @@ override __Value.
 
 sub __Value {
   my $self = shift;
-  my $field = lc(shift);
+  my $field = lc shift;
 
   if (!$self->{'fetched'}{$field} and my $id = $self->id() ) {
     my $pkey = $self->_PrimaryKey();
@@ -627,7 +726,9 @@ sub __Value {
     $self->{'fetched'}{$field} = 1;
   }
 
-  return($self->{'values'}{$field});
+  my $value = $self->{'values'}{$field};
+    
+  return $value;
 }
 # }}}
 # {{{ sub _Value 
@@ -676,16 +777,12 @@ sub __Set {
         @_
     );
 
-    $args{'Column'}        = $args{'Field'};
-    $args{'IsSQLFunction'} = $args{'IsSQL'};
+    $args{'Column'}        = delete $args{'Field'};
+    $args{'IsSQLFunction'} = delete $args{'IsSQL'};
 
     my $ret = Class::ReturnValue->new();
 
-    ## Cleanup the hash.
-    delete $args{'Field'};
-    delete $args{'IsSQL'};
-
-    unless ( defined( $args{'Column'} ) && $args{'Column'} ) {
+    unless ( $args{'Column'} ) {
         $ret->as_array( 0, 'No column specified' );
         $ret->as_error(
             errno        => 5,
@@ -695,7 +792,16 @@ sub __Set {
         return ( $ret->return_value );
     }
     my $column = lc $args{'Column'};
-    if (    ( defined $self->__Value($column) )
+    if ( !defined( $args{'Value'} ) ) {
+        $ret->as_array( 0, "No value passed to _Set" );
+        $ret->as_error(
+            errno        => 2,
+            do_backtrace => 0,
+            message      => "No value passed to _Set"
+        );
+        return ( $ret->return_value );
+    }
+    elsif (    ( defined $self->__Value($column) )
         and ( $args{'Value'} eq $self->__Value($column) ) )
     {
         $ret->as_array( 0, "That is already the current value" );
@@ -703,15 +809,6 @@ sub __Set {
             errno        => 1,
             do_backtrace => 0,
             message      => "That is already the current value"
-        );
-        return ( $ret->return_value );
-    }
-    elsif ( !defined( $args{'Value'} ) ) {
-        $ret->as_array( 0, "No value passed to _Set" );
-        $ret->as_error(
-            errno        => 2,
-            do_backtrace => 0,
-            message      => "No value passed to _Set"
         );
         return ( $ret->return_value );
     }
@@ -872,6 +969,10 @@ the object constructor's arguments.
 Subclasses can override _Object to insert custom access control or
 define default contructor arguments.
 
+Note that if you are using a C<Schema> with a C<REFERENCES> field, 
+this is unnecessary: the method to access the column's value will
+automatically turn it into the appropriate object.
+
 =cut
 
 sub _Object {
@@ -990,7 +1091,16 @@ sub LoadByCols  {
 		push @bind, $value;
 	}
 	else {
-		push @phrases, "($key IS NULL OR $key = '')";
+       push @phrases, "($key IS NULL OR $key = ?)";
+       my $meta = $self->_ClassAccessible->{$key};
+       $meta->{'type'} ||= '';
+       # TODO: type checking should be done in generic way
+       if ( $meta->{'is_numeric'} || $meta->{'type'} =~ /INT|NUMERIC|DECIMAL|REAL|DOUBLE|FLOAT/i  ) {
+            push @bind, 0;
+       } else {
+            push @bind, '';
+       }
+
 	}
     }
     
@@ -1034,18 +1144,15 @@ Like LoadById with basic support for compound primary keys.
 
 
 sub LoadByPrimaryKeys {
-    my ($self, $data) = @_;
+    my $self = shift;
+    my $data = (ref $_[0] eq 'HASH')? $_[0]: {@_};
 
-    if (ref($data) eq 'HASH') {
-       my %cols=();
-       foreach (@{$self->_PrimaryKeys}) {
-         $cols{$_}=$data->{$_} if (exists($data->{$_}));
-       }
-       return ($self->LoadByCols(%cols));
-    } 
-    else { 
-      return (0, "Invalid data");
+    my %cols=();
+    foreach (@{$self->_PrimaryKeys}) {
+	return (0, "Missing PK field: '$_'") unless defined $data->{$_};
+	$cols{$_}=$data->{$_};
     }
+    return ($self->LoadByCols(%cols));
 }
 
 # }}}
@@ -1146,6 +1253,10 @@ sub Create {
     my ($key);
     foreach $key ( keys %attribs ) {
         my $method = "Validate$key";
+
+        if ( $self->_Accessible( $key, 'record-write') ) {
+            $attribs{$key} = $attribs{$key}->id if UNIVERSAL::isa($attribs{$key}, 'DBIx::SearchBuilder::Record');
+        }
 
             #Truncate things that are too long for their datatypes
         $attribs{$key} = $self->TruncateValue ($key => $attribs{$key});

@@ -29,6 +29,7 @@ DBIx::SearchBuilder::Handle - Perl extension which is a generic DBI handle
                     Host => 'hostname',
                     User => 'dbuser',
                     Password => 'dbpassword');
+  # now $handle isa DBIx::SearchBuilder::Handle::mysql                    
  
 =head1 DESCRIPTION
 
@@ -69,6 +70,12 @@ You should _always_ set
      DisconnectHandleOnDestroy => 1 
 
 unless you have a legacy app like RT2 or RT 3.0.{0,1,2} that depends on the broken behaviour.
+
+If you created the handle with 
+     DBIx::SearchBuilder::Handle->new
+and there is a DBIx::SearchBuilder::Handle::(Driver) subclass for the driver you have chosen,
+the handle will be automatically "upgraded" into that subclass.
+
 =cut
 
 sub Connect  {
@@ -85,11 +92,19 @@ sub Connect  {
            DisconnectHandleOnDestroy => undef,
 	       @_);
 
+   if( $args{'Driver'} && !$self->isa( 'DBIx::SearchBuilder::Handle::'. $args{'Driver'} ) ) {
+      if ( $self->_UpgradeHandle($args{Driver}) ) {
+          return ($self->Connect( %args ));
+      }
+   }
+
+
     my $dsn = $self->DSN || '';
 
     # Setting this actually breaks old RT versions in subtle ways. So we need to explicitly call it
 
     $self->{'DisconnectHandleOnDestroy'} = $args{'DisconnectHandleOnDestroy'};
+    
 
   $self->BuildDSN(%args);
 
@@ -103,6 +118,7 @@ sub Connect  {
 
   #Set the handle 
   $self->dbh($handle);
+  
   return (1); 
     }
 
@@ -110,6 +126,30 @@ sub Connect  {
 
 }
 # }}}
+
+# {{{ _UpgradeHandle
+
+=head2 _UpgradeHandle DRIVER
+
+This private internal method turns a plain DBIx::SearchBuilder::Handle into one
+of the standard driver-specific subclasses.
+
+=cut
+
+sub _UpgradeHandle {
+    my $self = shift;
+    
+    my $driver = shift;
+    my $class = 'DBIx::SearchBuilder::Handle::' . $driver;
+    eval "require $class";
+    return if $@;
+    
+    bless $self, $class;
+    return 1;
+}
+
+# }}}
+
 
 # {{{ BuildDSN
 
@@ -958,7 +998,7 @@ sub _BuildJoins {
           }
     }
 
-    my $join_clause = $sb->{'table'} . " main ";
+    my $join_clause = $sb->Table . " main ";
 
 	
     my @keys = ( keys %{ $sb->{'left_joins'} } );

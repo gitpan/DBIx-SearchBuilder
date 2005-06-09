@@ -5,7 +5,7 @@ package DBIx::SearchBuilder;
 use strict;
 use vars qw($VERSION);
 
-$VERSION = "1.30_02";
+$VERSION = "1.30_03";
 
 =head1 NAME
 
@@ -14,22 +14,49 @@ DBIx::SearchBuilder - Encapsulate SQL queries and rows in simple perl objects
 =head1 SYNOPSIS
 
   use DBIx::SearchBuilder;
+  
+  package My::Things;
+  use base qw/DBIx::SearchBuilder/;
+  
+  sub _Init {
+      my $self = shift;
+      $self->Table('Things');
+      return $self->SUPER::_Init(@_);
+  }
+  
+  sub NewItem {
+      my $self = shift;
+      # MyThing is a subclass of DBIx::SearchBuilder::Record
+      return(MyThing->new);
+  }
+  
+  package main;
 
   use DBIx::SearchBuilder::Handle;
   my $handle = DBIx::SearchBuilder::Handle->new();
   $handle->Connect( Driver => 'SQLite', Database => "my_test_db" );
 
-  my $sb = DBIx::SearchBuilder->new( Handle => $handle, Table => "my_table" );
+  my $sb = My::Things->new( Handle => $handle );
 
   $sb->Limit( FIELD => "column_1", VALUE => "matchstring" );
 
   while ( my $record = $sb->Next ) {
-    print $record->my_column_name();
+      print $record->my_column_name();
   }
 
 =head1 DESCRIPTION
 
 This module provides an object-oriented mechanism for retrieving and updating data in a DBI-accesible database. 
+
+In order to use this module, you should create a subclass of C<DBIx::SearchBuilder> and a 
+subclass of C<DBIx::SearchBuilder::Record> for each table that you wish to access.  (See
+the documentation of C<DBIx::SearchBuilder::Record> for more information on subclassing it.)
+
+Your C<DBIx::SearchBuilder> subclass must override C<NewItem>, and probably should override
+at least C<_Init> also; at the very least, C<_Init> should probably call C<_Handle> and C<_Table>
+to set the database handle (a C<DBIx::SearchBuilder::Handle> object) and table name for the class.
+You can try to override just about every other method here, as long as you think you know what you
+are doing.
 
 =head1 METHOD NAMING
  
@@ -42,7 +69,20 @@ For example, the method C<RedoSearch> has the alias C<redo_search>.
 
 # {{{ sub new
 
-#instantiate a new object.
+=head2 new
+
+Creates a new SearchBuilder object and immediately calls C<_Init> with the same parameters
+that were passed to C<new>.  If you haven't overridden C<_Init> in your subclass, this means
+that you should pass in a C<DBIx::SearchBuilder::Handle> (or one of its subclasses) like this:
+
+   my $sb = My::DBIx::SearchBuilder::Subclass->new( Handle => $handle );
+
+However, if your subclass overrides _Init you do not need to take a Handle argument, as long
+as your subclass returns an appropriate handle object from the C<_Handle> method.  This is
+useful if you want all of your SearchBuilder objects to use a shared global handle and don't want
+to have to explicitly pass it in each time, for example.
+
+=cut
 
 sub new {
     my $proto = shift;
@@ -57,13 +97,19 @@ sub new {
 
 # {{{ sub _Init
 
-#Initialize the object
+=head2 _Init
+
+This method is called by C<new> with whatever arguments were passed to C<new>.  
+By default, it takes a C<DBIx::SearchBuilder::Handle> object as a C<Handle>
+argument, although this is not necessary if your subclass overrides C<_Handle>.
+
+=cut
 
 sub _Init {
     my $self = shift;
     my %args = ( Handle => undef,
                  @_ );
-    $self->{'DBIxHandle'} = $args{'Handle'};
+    $self->_Handle( $args{'Handle'} );
 
     $self->CleanSlate();
 }
@@ -75,8 +121,9 @@ sub _Init {
 =head2 CleanSlate
 
 This completely erases all the data in the SearchBuilder object. It's
-useful if a subclass is doing funky stuff to keep track of 
-a search
+useful if a subclass is doing funky stuff to keep track of a search and
+wants to reset the SearchBuilder data without losing its own data;
+it's probably cleaner to accomplish that in a different way, though.
 
 =cut
 
@@ -92,14 +139,19 @@ sub CleanSlate {
     $self->{'alias_count'}      = 0;
     $self->{'first_row'}        = 0;
     $self->{'must_redo_search'} = 1;
+    $self->{'show_rows'}        = 0;
     @{ $self->{'aliases'} } = ();
 
-    delete $self->{'items'}        if ( defined $self->{'items'} );
-    delete $self->{'left_joins'}   if ( defined $self->{'left_joins'} );
-    delete $self->{'raw_rows'}     if ( defined $self->{'raw_rows'} );
-    delete $self->{'count_all'}    if ( defined $self->{'count_all'} );
-    delete $self->{'subclauses'}   if ( defined $self->{'subclauses'} );
-    delete $self->{'restrictions'} if ( defined $self->{'restrictions'} );
+    delete $self->{$_} for qw(
+	items
+	left_joins
+	raw_rows
+	count_all
+	subclauses
+	restrictions
+	_open_parens
+	_close_parens
+    );
 
     #we have no limit statements. DoSearch won't work.
     $self->_isLimited(0);
@@ -127,6 +179,14 @@ sub _Handle {
 # }}}
 
 # {{{ sub _DoSearch
+    
+=head2 _DoSearch
+
+This internal private method actually executes the search on the database;
+it is called automatically the first time that you actually need results
+(such as a call to C<Next>).
+
+=cut
 
 sub _DoSearch {
     my $self = shift;
@@ -136,56 +196,73 @@ sub _DoSearch {
     # If we're about to redo the search, we need an empty set of items
     delete $self->{'items'};
 
-    eval {
-        
-        # TODO: finer-grained eval and cheking.
-       my  $records = $self->_Handle->SimpleQuery($QueryString);
-        my $counter;
-        $self->{'rows'} = 0;
-        while ( my $row = $records->fetchrow_hashref() ) {
-            my $item = $self->NewItem();
-            $item->LoadFromHash($row);
-            $self->AddRecord($item);
-        }
+    my $records = $self->_Handle->SimpleQuery($QueryString);
+    return 0 unless $records;
 
-        $self->{'must_redo_search'} = 0;
-    };
+    while ( my $row = $records->fetchrow_hashref() ) {
+	my $item = $self->NewItem();
+	$item->LoadFromHash($row);
+	$self->AddRecord($item);
+    }
+    return $self->_RecordCount if $records->err;
 
-    return ( $self->{'rows'});
+    $self->{'must_redo_search'} = 0;
+
+    return $self->_RecordCount;
 }
 
 # }}}
 
 =head2 AddRecord RECORD
 
-Adds a record object to this collection
+Adds a record object to this collection.
 
 =cut
 
 sub AddRecord {
     my $self = shift;
     my $record = shift;
-   push @{$self->{'items'}}, $record;
-   $self->{'rows'}++; 
+    push @{$self->{'items'}}, $record;
+}
+
+=head2 _RecordCount
+
+This private internal method returns the number of Record objects saved
+as a result of the last query.
+
+=cut
+
+sub _RecordCount {
+    my $self = shift;
+    return 0 unless defined $self->{'items'};
+    return scalar @{ $self->{'items'} };
 }
 
 
 # {{{ sub _DoCount
+
+=head2 _DoCount
+
+This internal private method actually executes a counting operation on the database;
+it is used by C<Count> and C<CountAll>.
+
+=cut
+
 
 sub _DoCount {
     my $self = shift;
     my $all  = shift || 0;
 
     my $QueryString = $self->BuildSelectCountQuery();
-    eval {
-        # TODO: finer-grained Eval
-        my $records     = $self->_Handle->SimpleQuery($QueryString);
+    my $records     = $self->_Handle->SimpleQuery($QueryString);
+    return 0 unless $records;
 
-        my @row = $records->fetchrow_array();
-        $self->{ $all ? 'count_all' : 'raw_rows' } = $row[0];
+    my @row = $records->fetchrow_array();
+    return 0 if $records->err;
 
-        return ( $row[0] );
-    };
+    $self->{ $all ? 'count_all' : 'raw_rows' } = $row[0];
+
+    return ( $row[0] );
 }
 
 # }}}
@@ -194,9 +271,11 @@ sub _DoCount {
 =head2 _ApplyLimits STATEMENTREF
 
 This routine takes a reference to a scalar containing an SQL statement. 
-It massages the statement to limit the returned rows to $self->RowsPerPage
-starting with $self->FirstRow
-
+It massages the statement to limit the returned rows to only C<< $self->RowsPerPage >>
+rows, skipping C<< $self->FirstRow >> rows.  (That is, if rows are numbered
+starting from 0, row number C<< $self->FirstRow >> will be the first row returned.)
+Note that it probably makes no sense to set these variables unless you are also
+enforcing an ordering on the rows (with C<OrderByCols>, say).
 
 =cut
 
@@ -206,9 +285,9 @@ sub _ApplyLimits {
     my $statementref = shift;
     $self->_Handle->ApplyLimits($statementref, $self->RowsPerPage, $self->FirstRow);
     $$statementref =~ s/main\.\*/join(', ', @{$self->{columns}})/eg
-	if $self->{columns} and @{$self->{columns}};
+	    if $self->{columns} and @{$self->{columns}};
     if (my $groupby = $self->_GroupClause) {
-	$$statementref =~ s/(LIMIT \d+)?$/$groupby $1/;
+	    $$statementref =~ s/(LIMIT \d+)?$/$groupby $1/;
     }
     
 }
@@ -243,7 +322,7 @@ sub _DistinctQuery {
 
 =head2 _BuildJoins
 
-Build up all of the joins we need to perform this query
+Build up all of the joins we need to perform this query.
 
 =cut
 
@@ -260,7 +339,7 @@ sub _BuildJoins {
 
 =head2 _isJoined 
 
-Returns true if this Searchbuilder requires joins between tables
+Returns true if this SearchBuilder will be joining multiple tables together.
 
 =cut
 
@@ -343,7 +422,7 @@ sub BuildSelectQuery {
 
     # DISTINCT query only required for multi-table selects
     if ($self->_isJoined) {
-        $self->_DistinctQuery(\$QueryString, $self->{'table'});
+        $self->_DistinctQuery(\$QueryString, $self->Table);
     } else {
         $QueryString = "SELECT main.* FROM $QueryString";
     }
@@ -410,9 +489,9 @@ sub Next {
 
     return (undef) unless ( $self->_isLimited );
 
-    $self->_DoSearch() if ( $self->{'must_redo_search'} != 0 );
+    $self->_DoSearch() if $self->{'must_redo_search'};
 
-    if ( $self->{'itemscount'} < $self->{'rows'} ) {    #return the next item
+    if ( $self->{'itemscount'} < $self->_RecordCount ) {    #return the next item
         my $item = ( $self->{'items'}[ $self->{'itemscount'} ] );
         $self->{'itemscount'}++;
         return ($item);
@@ -641,7 +720,7 @@ this search case sensitive
 sub Limit {
     my $self = shift;
     my %args = (
-        TABLE           => $self->{'table'},
+        TABLE           => $self->Table,
         FIELD           => undef,
         VALUE           => undef,
         ALIAS           => undef,
@@ -752,7 +831,7 @@ sub ImportRestrictions {
 
 sub _GenericRestriction {
     my $self = shift;
-    my %args = ( TABLE           => $self->{'table'},
+    my %args = ( TABLE           => $self->Table,
                  FIELD           => undef,
                  VALUE           => undef,
                  ALIAS           => undef,
@@ -782,7 +861,7 @@ sub _GenericRestriction {
     unless ( $args{'ALIAS'} ) {
 
         #if the table we're looking at is the same as the main table
-        if ( $args{'TABLE'} eq $self->{'table'} ) {
+        if ( $args{'TABLE'} eq $self->Table ) {
 
             # TODO this code assumes no self joins on that table.
             # if someone can name a case where we'd want to do that,
@@ -1046,9 +1125,7 @@ returns the ORDER BY clause for the search.
 sub _OrderClause {
     my $self = shift;
 
-    unless ( defined $self->{'order_clause'} ) {
-	return "";
-    }
+    return '' unless $self->{'order_clause'};
     return ($self->{'order_clause'});
 }
 
@@ -1066,7 +1143,7 @@ Alias for the GroupByCols method.
 
 =cut
 
-sub GroupBy { (shift)->GroupByCols( @_) }
+sub GroupBy { (shift)->GroupByCols( @_ ) }
 
 # }}}
 
@@ -1124,9 +1201,7 @@ Private function to return the "GROUP BY" clause for this query.
 sub _GroupClause {
     my $self = shift;
 
-    unless ( defined $self->{'group_clause'} ) {
-	    return "";
-    }
+    return '' unless $self->{'group_clause'};
     return ($self->{'group_clause'});
 }
 
@@ -1372,7 +1447,7 @@ sub Count {
     # If we have loaded everything from the DB we have an
     # accurate count already.
     else {
-        return ( $self->{'rows'} );
+        return $self->_RecordCount;
     }
 }
 
@@ -1427,7 +1502,7 @@ sub CountAll {
     # If we have loaded everything from the DB we have an
     # accurate count already.
     else {
-        return ( $self->{'rows'} );
+        return $self->_RecordCount;
     }
 }
 
@@ -1445,11 +1520,13 @@ Returns true if the current row is the last record in the set.
 sub IsLast {
     my $self = shift;
 
+    return undef unless $self->Count;
+
     if ( $self->_ItemsCounter == $self->Count ) {
         return (1);
     }
     else {
-        return (undef);
+        return (0);
     }
 }
 
@@ -1498,7 +1575,7 @@ sub Column {
             $alias;
         }
         else {
-            $self->{table};
+            $self->Table;
         }
     };
 
@@ -1521,7 +1598,7 @@ sub Column {
     }
 
     my $column = "col" . @{ $self->{columns} ||= [] };
-    $column = $args{FIELD} if $table eq $self->{table} and !$args{ALIAS};
+    $column = $args{FIELD} if $table eq $self->Table and !$args{ALIAS};
     push @{ $self->{columns} }, "$name AS \L$column";
     return $column;
 }
@@ -1601,7 +1678,7 @@ sub HasField {
 
 =head2 Table [TABLE]
 
-If called with an arguemnt, sets this collection's table.
+If called with an argument, sets this collection's table.
 
 Always returns this collection's table.
 
@@ -1630,10 +1707,24 @@ __END__
 # {{{ POD
 
 
+=head1 TESTING
+
+In order to test most of the features of C<DBIx::SearchBuilder>, you need
+to provide C<make test> with a test database.  For each DBI driver that you
+would like to test, set the environment variables C<SB_TEST_FOO>, C<SB_TEST_FOO_USER>,
+and C<SB_TEST_FOO_PASS> to a database name, database username, and database password,
+where "FOO" is the driver name in all uppercase.  You can test as many drivers
+as you like.  (The appropriate C<DBD::> module needs to be installed in order for
+the test to work.)  Note that the C<SQLite> driver will automatically be tested if C<DBD::Sqlite>
+is installed, using a temporary file as the database.  For example:
+
+  SB_TEST_MYSQL=test SB_TEST_MYSQL_USER=root SB_TEST_MYSQL_PASS=foo \
+    SB_TEST_PG=test SB_TEST_PG_USER=postgres  make test
+
 
 =head1 AUTHOR
 
-Copyright (c) 2001-2004 Jesse Vincent, jesse@fsck.com.
+Copyright (c) 2001-2005 Jesse Vincent, jesse@fsck.com.
 
 All rights reserved.
 
