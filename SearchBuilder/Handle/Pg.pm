@@ -6,7 +6,7 @@ use strict;
 
 use vars qw($VERSION @ISA $DBIHandle $DEBUG);
 use base qw(DBIx::SearchBuilder::Handle);
-use Want qw(want);
+use Want qw(want howmany);
 
 use strict;
 
@@ -26,7 +26,6 @@ compensates for some of the idiosyncrasies of Postgres.
 
 =cut
 
-# {{{ sub Connect
 
 =head2 Connect
 
@@ -45,9 +44,7 @@ sub Connect {
     $self->AutoCommit(1);
     return ($DBIHandle); 
 }
-# }}}
 
-# {{{ sub Insert
 
 =head2 Insert
 
@@ -84,9 +81,7 @@ sub Insert {
     return ($self->{'id'});
 }
 
-# }}}
 
-# {{{ BinarySafeBLOBs
 
 =head2 BinarySafeBLOBs
 
@@ -99,7 +94,6 @@ sub BinarySafeBLOBs {
     return(undef);
 }
 
-# }}}
 
 =head2 ApplyLimits STATEMENTREF ROWS_PER_PAGE FIRST_ROW
 
@@ -128,7 +122,6 @@ sub ApplyLimits {
 
 }
 
-# {{{ _MakeClauseCaseInsensitive
 
 =head2 _MakeClauseCaseInsensitive FIELD OPERATOR VALUE
 
@@ -146,7 +139,7 @@ sub _MakeClauseCaseInsensitive {
     my $value    = shift;
 
 
-    if ($value =~ /^\d+$/) { # we don't need to downcase numeric values
+    if ($value =~ /^['"]?\d+['"]?$/) { # we don't need to downcase numeric values
         	return ( $field, $operator, $value);
     }
 
@@ -155,7 +148,7 @@ sub _MakeClauseCaseInsensitive {
         return ( $field, $operator, $value );
     }
     elsif ( $operator =~ /=/ ) {
-	if (want(4)) {
+	if (howmany() >= 4) {
         	return ( "LOWER($field)", $operator, $value, "LOWER(?)"); 
 	} 
 	# RT 3.0.x and earlier  don't know how to cope with a "LOWER" function 
@@ -171,7 +164,6 @@ sub _MakeClauseCaseInsensitive {
     }
 }
 
-# }}}
 1;
 
 __END__

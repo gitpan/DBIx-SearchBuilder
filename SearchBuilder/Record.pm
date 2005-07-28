@@ -8,7 +8,6 @@ use vars qw($AUTOLOAD);
 use Class::ReturnValue;
 
 
-# {{{ Doc
 
 =head1 NAME
 
@@ -345,7 +344,6 @@ For example, the method C<_PrimaryKeys> has the alias C<_primary_keys>.
 
 =cut
 
-# }}}
 
 
 =head2  new 
@@ -366,7 +364,6 @@ sub new  {
     return $self;
   }
 
-# }}}
 
 # Not yet documented here.  Should almost certainly be overloaded.
 sub _Init {
@@ -375,7 +372,6 @@ sub _Init {
     $self->_Handle($handle);
 }
 
-# {{{ sub Id and id
 
 =head2 id
 
@@ -393,7 +389,6 @@ sub Id  {
     return $ret;
 }
 
-# }}}
 
 =head2 primary_keys
 
@@ -414,15 +409,11 @@ sub PrimaryKeys {
 
 
 
-# {{{ Routines dealing with getting and setting row data
 
-# {{{ sub DESTROY
 sub DESTROY {
     return 1;
 }
-# }}}
 
-# {{{ sub AUTOLOAD 
 
 sub AUTOLOAD {
     my $self = $_[0];
@@ -435,7 +426,7 @@ sub AUTOLOAD {
         goto &$AUTOLOAD;
     }
     elsif ( $self->_Accessible( $Attrib, 'record-read') ) {
-        *{$AUTOLOAD} = sub { $_[0]->_ToRecord( $Attrib, $_[0]->_Value($Attrib) ) };
+        *{$AUTOLOAD} = sub { $_[0]->_ToRecord( $Attrib, $_[0]->__Value($Attrib) ) };
         goto &$AUTOLOAD;        
     }
     elsif ( $self->_Accessible( $Attrib, 'foreign-collection') ) {
@@ -507,9 +498,7 @@ sub AUTOLOAD {
 
 }
 
-# }}}
 
-# {{{ sub _Accessible
 
 =head2 _Accessible KEY MODE
 
@@ -530,7 +519,6 @@ sub _Accessible {
     return $attribute->{$mode};
 }
 
-# }}}
 
 
 =head2 _PrimaryKeys
@@ -553,7 +541,6 @@ sub _PrimaryKey {
     return $pkeys->[0];
 }
 
-# {{{ sub _ClassAccessible
 
 =head2 _ClassAccessible 
 
@@ -594,9 +581,9 @@ sub _ClassAccessible {
 sub _ClassAccessibleFromSchema {
   my $self = shift;
   
-  my $accessible = {
-    # XXX TODO FIXME: should fetch custom primary key name
-    'id' => { 'read' => 1 },
+  my $accessible = {};
+  foreach my $key ($self->_PrimaryKeys) {
+   $accessible->{$key} = { 'read' => 1 };
   };
   
   my $schema = $self->Schema;
@@ -618,7 +605,6 @@ sub _ClassAccessibleFromSchema {
   return $accessible;  
 }
 
-# }}}
 
 sub _ToRecord {
     my $self = shift;
@@ -676,13 +662,11 @@ Returns an array of the attributes of this class defined as "read" => 1 in this 
 sub ReadableAttributes {
     my $self = shift;
     my $ca = $self->_ClassAccessible();
-    my @readable = grep { $ca->{$_}->{read}} keys %{$ca};
+    my @readable = grep { $ca->{$_}->{'read'} or $ca->{$_}->{'record-read'} } keys %{$ca};
     return (@readable);
 }
 
-# }}}
 
-# {{{  sub WritableAttributes 
 
 =head2 WritableAttributes
 
@@ -693,15 +677,12 @@ Returns an array of the attributes of this class defined as "write" => 1 in this
 sub WritableAttributes {
     my $self = shift;
     my $ca = $self->_ClassAccessible();
-    my @writable = grep { $ca->{$_}->{write}} keys %{$ca};
-    return (@writable);
-
+    my @writable = grep { $ca->{$_}->{'write'} || $ca->{$_}->{'record-write'} } keys %{$ca};
+    return @writable;
 }
 
-# }}}
 
 
-# {{{ sub __Value {
 
 =head2 __Value
 
@@ -730,8 +711,6 @@ sub __Value {
     
   return $value;
 }
-# }}}
-# {{{ sub _Value 
 
 =head2 _Value
 
@@ -746,9 +725,7 @@ sub _Value  {
   return ($self->__Value(@_));
 }
 
-# }}}
 
-# {{{ sub _Set 
 
 =head2 _Set
 
@@ -877,11 +854,60 @@ sub __Set {
     return ( $ret->return_value );
 }
 
-# }}}
+=head2 _Canonicalize PARAMHASH
 
-# {{{ sub _Validate 
+This routine massages an input value (VALUE) for FIELD into something that's 
+going to be acceptable.
 
-#TODO: Implement _Validate.
+Takes
+
+=over
+
+=item FIELD
+
+=item VALUE
+
+=item FUNCTION
+
+=back
+
+
+Takes:
+
+=over
+
+=item FIELD
+
+=item VALUE
+
+=item FUNCTION
+
+=back
+
+Returns a replacement VALUE. 
+
+=cut
+
+sub _Canonicalize {
+    my $self = shift;
+    my $field = shift;
+    
+
+
+}
+
+
+=head2 _Validate FIELD VALUE
+
+Validate that VALUE will be an acceptable value for FIELD. 
+
+Currently, this routine does nothing whatsoever. 
+
+If it succeeds (which is always the case right now), returns true. Otherwise returns false.
+
+=cut
+
+
 
 
 sub _Validate  {
@@ -900,9 +926,7 @@ sub _Validate  {
    return(1); 
   }	
 
-# }}}	
 
-# {{{ sub TruncateValue 
 
 =head2 TruncateValue  KEY VALUE
 
@@ -955,9 +979,7 @@ sub TruncateValue {
     }
 
 }
-# }}}
 
-# {{{ sub _Object 
 
 =head2 _Object
 
@@ -1004,11 +1026,8 @@ sub __Object {
     return $object;
 }
 
-# }}}
   
-# {{{ routines dealing with loading records
 
-# {{{ sub Load 
 
 # load should do a bit of overloading
 # if we call it with only one argument, we're trying to load by reference.
@@ -1031,8 +1050,6 @@ sub Load  {
     return $self->LoadById(@_);
 }
 
-# }}}
-# {{{ sub LoadByCol 
 
 =head2 LoadByCol
 
@@ -1052,9 +1069,7 @@ sub LoadByCol  {
     return($self->LoadByCols($col => $val));
 }
 
-# }}}
 
-# {{{ sub LoadByCols
 
 =head2 LoadByCols
 
@@ -1110,9 +1125,7 @@ sub LoadByCols  {
 }
 
 
-# }}}
 
-# {{{ sub LoadById 
 
 =head2 LoadById
 
@@ -1130,10 +1143,8 @@ sub LoadById  {
     return ($self->LoadByCols($pkey => $id));
 }
 
-# }}}  
 
 
-# {{{ LoadByPrimaryKeys 
 
 =head2 LoadByPrimaryKeys 
 
@@ -1155,10 +1166,8 @@ sub LoadByPrimaryKeys {
     return ($self->LoadByCols(%cols));
 }
 
-# }}}
 
 
-# {{{ sub LoadFromHash
 
 =head2 LoadFromHash
 
@@ -1181,9 +1190,7 @@ sub LoadFromHash {
   return $self->id();
 }
 
-# }}}
 
-# {{{ sub _LoadFromSQL 
 
 =head2 _LoadFromSQL QUERYSTRING @BIND_VALUES
 
@@ -1229,13 +1236,9 @@ sub _LoadFromSQL {
 
 }
 
-# }}}
 
-# }}}
 
-# {{{ Routines dealing with creating or deleting rows in the DB
 
-# {{{ sub Create 
 
 =head2 Create
 
@@ -1252,25 +1255,25 @@ sub Create {
 
     my ($key);
     foreach $key ( keys %attribs ) {
-        my $method = "Validate$key";
 
-        if ( $self->_Accessible( $key, 'record-write') ) {
-            $attribs{$key} = $attribs{$key}->id if UNIVERSAL::isa($attribs{$key}, 'DBIx::SearchBuilder::Record');
+        if ( $self->_Accessible( $key, 'record-write' ) ) {
+            $attribs{$key} = $attribs{$key}->id
+              if UNIVERSAL::isa( $attribs{$key},
+                'DBIx::SearchBuilder::Record' );
         }
 
-            #Truncate things that are too long for their datatypes
-        $attribs{$key} = $self->TruncateValue ($key => $attribs{$key});
+        #Truncate things that are too long for their datatypes
+        $attribs{$key} = $self->TruncateValue( $key => $attribs{$key} );
 
-        unless ( $self->$method( $attribs{$key} ) ) {
-            delete $attribs{$key};
-        }
     }
     unless ( $self->_Handle->KnowsBLOBs ) {
+
         # Support for databases which don't deal with LOBs automatically
         my $ca = $self->_ClassAccessible();
         foreach $key ( keys %attribs ) {
             if ( $ca->{$key}->{'type'} =~ /^(text|longtext|clob|blob|lob)$/i ) {
-                my $bhash = $self->_Handle->BLOBParams( $key, $ca->{$key}->{'type'} );
+                my $bhash =
+                  $self->_Handle->BLOBParams( $key, $ca->{$key}->{'type'} );
                 $bhash->{'value'} = $attribs{$key};
                 $attribs{$key} = $bhash;
             }
@@ -1279,9 +1282,6 @@ sub Create {
     return ( $self->_Handle->Insert( $self->Table, %attribs ) );
 }
 
-# }}}
-
-# {{{ sub Delete 
 
 =head2 Delete
 
@@ -1321,12 +1321,9 @@ sub __Delete {
     } 
 }
 
-# }}}
-
-# }}}
 
 
-# {{{ sub Table
+
 
 =head2 Table
 
@@ -1344,9 +1341,7 @@ sub Table {
     return ($self->{'table'});
 }
 
-# }}}
 
-# {{{ sub _Handle 
 
 =head2 _Handle
 
@@ -1363,7 +1358,6 @@ sub _Handle  {
     return ($self->{'DBIxHandle'});
   }
 
-# }}}
 
 if( eval { require capitalization } ) {
 	capitalization->unimport( __PACKAGE__ );
@@ -1373,7 +1367,6 @@ if( eval { require capitalization } ) {
 
 __END__
 
-# {{{ POD
 
 
 =head1 AUTHOR
@@ -1390,5 +1383,4 @@ L<DBIx::SearchBuilder>
 
 =cut
 
-# }}}
 

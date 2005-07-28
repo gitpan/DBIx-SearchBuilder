@@ -1,11 +1,10 @@
-# {{{ Version, package, new, etc
 
 package DBIx::SearchBuilder;
 
 use strict;
 use vars qw($VERSION);
 
-$VERSION = "1.30_03";
+$VERSION = "1.30";
 
 =head1 NAME
 
@@ -67,7 +66,6 @@ For example, the method C<RedoSearch> has the alias C<redo_search>.
 
 =cut
 
-# {{{ sub new
 
 =head2 new
 
@@ -93,9 +91,7 @@ sub new {
     return ($self);
 }
 
-# }}}
 
-# {{{ sub _Init
 
 =head2 _Init
 
@@ -114,9 +110,7 @@ sub _Init {
     $self->CleanSlate();
 }
 
-# }}}
 
-# {{{ sub CleanSlate
 
 =head2 CleanSlate
 
@@ -158,9 +152,7 @@ sub CleanSlate {
 
 }
 
-# }}}
 
-# {{{ sub _Handle
 
 =head2 _Handle  [DBH]
 
@@ -176,9 +168,7 @@ sub _Handle {
     return ( $self->{'DBIxHandle'} );
 }
 
-# }}}
 
-# {{{ sub _DoSearch
     
 =head2 _DoSearch
 
@@ -211,7 +201,6 @@ sub _DoSearch {
     return $self->_RecordCount;
 }
 
-# }}}
 
 =head2 AddRecord RECORD
 
@@ -239,7 +228,6 @@ sub _RecordCount {
 }
 
 
-# {{{ sub _DoCount
 
 =head2 _DoCount
 
@@ -265,7 +253,6 @@ sub _DoCount {
     return ( $row[0] );
 }
 
-# }}}
 
 
 =head2 _ApplyLimits STATEMENTREF
@@ -286,13 +273,8 @@ sub _ApplyLimits {
     $self->_Handle->ApplyLimits($statementref, $self->RowsPerPage, $self->FirstRow);
     $$statementref =~ s/main\.\*/join(', ', @{$self->{columns}})/eg
 	    if $self->{columns} and @{$self->{columns}};
-    if (my $groupby = $self->_GroupClause) {
-	    $$statementref =~ s/(LIMIT \d+)?$/$groupby $1/;
-    }
-    
 }
 
-# {{{ sub _DistinctQuery
 
 =head2 _DistinctQuery STATEMENTREF
 
@@ -316,9 +298,7 @@ sub _DistinctQuery {
     }
 }
 
-# }}}
 
-# {{{ sub _BuildJoins
 
 =head2 _BuildJoins
 
@@ -334,8 +314,6 @@ sub _BuildJoins {
 
 }
 
-# }}}
-# {{{ sub _isJoined
 
 =head2 _isJoined 
 
@@ -353,10 +331,8 @@ sub _isJoined {
 
 }
 
-# }}}
 
 
-# {{{ sub _LimitClause
 
 # LIMIT clauses are used for restricting ourselves to subsets of the search.
 
@@ -379,9 +355,7 @@ sub _LimitClause {
     return $limit_clause;
 }
 
-# }}}
 
-# {{{ sub _isLimited
 
 =head2 _isLimited
 
@@ -399,11 +373,8 @@ sub _isLimited {
     }
 }
 
-# }}}
 
-# }}} Private utility methods
 
-# {{{ BuildSelectQuery
 
 =head2 BuildSelectQuery
 
@@ -427,7 +398,9 @@ sub BuildSelectQuery {
         $QueryString = "SELECT main.* FROM $QueryString";
     }
 
-    $QueryString .= $self->_OrderClause;
+    $QueryString .= ' ' . $self->_GroupClause . ' ';
+
+    $QueryString .= ' ' . $self->_OrderClause . ' ';
 
     $self->_ApplyLimits(\$QueryString);
 
@@ -435,9 +408,7 @@ sub BuildSelectQuery {
 
 }
 
-# }}}
 
-# {{{ BuildSelectCountQuery
 
 =head2 BuildSelectCountQuery
 
@@ -467,11 +438,8 @@ sub BuildSelectCountQuery {
     return ($QueryString);
 }
 
-# }}}
 
-# {{{ Methods dealing traversing rows within the found set
 
-# {{{ sub Next
 
 =head2 Next
 
@@ -502,9 +470,7 @@ sub Next {
     }
 }
 
-# }}}
 
-# {{{ sub GotoFirstItem
 
 =head2 GotoFirstItem
 
@@ -520,9 +486,7 @@ sub GotoFirstItem {
     $self->GotoItem(0);
 }
 
-# }}}
 
-# {{{ sub GotoItem
 
 
 =head2 GotoItem
@@ -539,9 +503,7 @@ sub GotoItem {
     $self->{'itemscount'} = $item;
 }
 
-# }}}
 
-# {{{ sub First
 
 =head2 First
 
@@ -555,9 +517,7 @@ sub First {
     return ( $self->Next );
 }
 
-# }}}
 
-# {{{ sub Last
 
 =head2 Last
 
@@ -571,9 +531,7 @@ sub Last {
     return ( $self->Next );
 }
 
-# }}}
 
-# {{{ ItemsArrayRef
 
 =head2 ItemsArrayRef
 
@@ -595,11 +553,8 @@ sub ItemsArrayRef {
     return ( $self->{'items'} || [] );
 }
 
-# }}}
 
-# }}}
 
-# {{{ sub NewItem
 
 =head2 NewItem
 
@@ -615,9 +570,7 @@ sub NewItem {
 "DBIx::SearchBuilder needs to be subclassed. you can't use it directly.\n";
 }
 
-# }}}
 
-# {{{ sub RedoSearch
 
 =head2 RedoSearch
 
@@ -631,11 +584,8 @@ sub RedoSearch {
     $self->{'must_redo_search'} = 1;
 }
 
-# }}}
 
-# {{{ Routines dealing with Restrictions (where subclauses)
 
-# {{{ sub UnLimit
 
 =head2 UnLimit
 
@@ -649,9 +599,7 @@ sub UnLimit {
     $self->_isLimited(-1);
 }
 
-# }}}
 
-# {{{ sub Limit
 
 =head2 Limit
 
@@ -787,9 +735,7 @@ sub Limit {
     }
 }
 
-# }}}
 
-# {{{ sub ShowRestrictions
 
 =head2 ShowRestrictions
 
@@ -807,9 +753,7 @@ sub ShowRestrictions {
 
 }
 
-# }}}
 
-# {{{ sub ImportRestrictions
 
 =head2 ImportRestrictions
 
@@ -825,9 +769,7 @@ sub ImportRestrictions {
     $self->{'where_clause'} = shift;
 }
 
-# }}}
 
-# {{{ sub _GenericRestriction
 
 sub _GenericRestriction {
     my $self = shift;
@@ -946,9 +888,7 @@ sub _GenericRestriction {
 
 }
 
-# }}}
 
-# {{{ Parentheses Control
 sub _OpenParen {
     my ( $self, $clause ) = @_;
     $self->{_open_parens}{$clause}++;
@@ -966,9 +906,7 @@ sub _CloseParen {
     }
 }
 
-# }}}
 
-# {{{ sub _AddRestriction
 sub _AddSubClause {
     my $self      = shift;
     my $clauseid  = shift;
@@ -978,9 +916,7 @@ sub _AddSubClause {
 
 }
 
-# }}}
 
-# {{{ sub _WhereClause
 
 sub _WhereClause {
     my $self = shift;
@@ -1010,9 +946,7 @@ sub _WhereClause {
 
 }
 
-# }}}
 
-# {{{ sub _CompileGenericRestrictions
 
 #Compile the restrictions to a WHERE Clause
 
@@ -1032,13 +966,9 @@ sub _CompileGenericRestrictions {
     }
 }
 
-# }}}
 
-# }}}
 
-# {{{ Routines dealing with ordering
 
-# {{{ sub OrderBy
 
 =head2 Orderby PARAMHASH
 
@@ -1112,9 +1042,7 @@ sub OrderByCols {
     $self->RedoSearch();
 }
 
-# }}} 
 
-# {{{ sub _OrderClause
 
 =head2 _OrderClause
 
@@ -1129,13 +1057,9 @@ sub _OrderClause {
     return ($self->{'order_clause'});
 }
 
-# }}}
 
-# }}}
 
-# {{{ Routines dealing with grouping
 
-# {{{ GroupBy (OBSOLETE)
 
 =head2 GroupBy  (DEPRECATED)
 
@@ -1145,9 +1069,7 @@ Alias for the GroupByCols method.
 
 sub GroupBy { (shift)->GroupByCols( @_ ) }
 
-# }}}
 
-# {{{ GroupByCols
 
 =head2 GroupByCols ARRAY_OF_HASHES
 
@@ -1188,9 +1110,7 @@ sub GroupByCols {
     }
     $self->RedoSearch();
 }
-# }}} 
 
-# {{{ _GroupClause
 
 =head2 _GroupClause
 
@@ -1205,13 +1125,9 @@ sub _GroupClause {
     return ($self->{'group_clause'});
 }
 
-# }}}
 
-# }}}
 
-# {{{ routines dealing with table aliases and linking tables
 
-# {{{ sub NewAlias
 
 =head2 NewAlias
 
@@ -1234,9 +1150,7 @@ sub NewAlias {
     return $alias;
 }
 
-# }}}
 
-# {{{ sub _GetAlias
 
 # _GetAlias is a private function which takes an tablename and
 # returns a new alias for that table without adding something
@@ -1254,9 +1168,7 @@ sub _GetAlias {
 
 }
 
-# }}}
 
-# {{{ sub Join
 
 =head2 Join
 
@@ -1294,34 +1206,24 @@ sub Join {
 
 }
 
-# }}}
 
-# }}}
 
-# {{{ Deal with 'pages' of results'
 
-# {{{ sub NextPage
 
 sub NextPage {
     my $self = shift;
     $self->FirstRow( $self->FirstRow + $self->RowsPerPage );
 }
 
-# }}}
 
-# {{{ sub FirstPage
 sub FirstPage {
     my $self = shift;
     $self->FirstRow(1);
 }
 
-# }}}
 
-# {{{ sub LastPage
 
-# }}}
 
-# {{{ sub PrevPage
 
 sub PrevPage {
     my $self = shift;
@@ -1333,9 +1235,7 @@ sub PrevPage {
     }
 }
 
-# }}}
 
-# {{{ sub GotoPage
 
 sub GotoPage {
     my $self = shift;
@@ -1348,9 +1248,7 @@ sub GotoPage {
     }
 }
 
-# }}}
 
-# {{{ sub RowsPerPage
 
 =head2 RowsPerPage
 
@@ -1367,9 +1265,7 @@ sub RowsPerPage {
     return ( $self->{'show_rows'} );
 }
 
-# }}}
 
-# {{{ sub FirstRow
 
 =head2 FirstRow
 
@@ -1395,13 +1291,9 @@ sub FirstRow {
     return ( $self->{'first_row'} );
 }
 
-# }}}
 
-# }}}
 
-# {{{ Public utility methods
 
-# {{{ sub _ItemsCounter
 
 =head2 _ItemsCounter
 
@@ -1414,9 +1306,7 @@ sub _ItemsCounter {
     return $self->{'itemscount'};
 }
 
-# }}}
 
-# {{{ sub Count
 
 =head2 Count
 
@@ -1451,9 +1341,7 @@ sub Count {
     }
 }
 
-# }}}
 
-# {{{ sub CountAll
 
 =head2 CountAll
 
@@ -1506,10 +1394,8 @@ sub CountAll {
     }
 }
 
-# }}}
 
 
-# {{{ sub IsLast
 
 =head2 IsLast
 
@@ -1530,9 +1416,7 @@ sub IsLast {
     }
 }
 
-# }}}
 
-# {{{ sub DEBUG
 
 sub DEBUG {
     my $self = shift;
@@ -1542,14 +1426,11 @@ sub DEBUG {
     return ( $self->{'DEBUG'} );
 }
 
-# }}}
 
 
 
 
-# }}}
 
-# {{{ Column
 
 =head2 Column { FIELD => undef } 
 
@@ -1603,9 +1484,7 @@ sub Column {
     return $column;
 }
 
-# }}}
 
-# {{{ Columns 
 
 
 =head2 Columns LIST
@@ -1619,9 +1498,7 @@ sub Columns {
     $self->Column( FIELD => $_ ) for @_;
 }
 
-# }}}
 
-# {{{ Fields
 
 =head2 Fields TABLE
  
@@ -1649,10 +1526,8 @@ sub Fields {
       };
 }
 
-# }}}
 
 
-# {{{ HasField
 
 =head2 HasField  { TABLE => undef, FIELD => undef }
 
@@ -1672,9 +1547,7 @@ sub HasField {
     return grep { $_ eq $field } $self->Fields($table);
 }
 
-# }}}
 
-# {{{ SetTable
 
 =head2 Table [TABLE]
 
@@ -1696,7 +1569,6 @@ sub Table {
 }
 
 
-# }}}
 if( eval { require capitalization } ) {
 	capitalization->unimport( __PACKAGE__ );
 }
@@ -1704,7 +1576,6 @@ if( eval { require capitalization } ) {
 1;
 __END__
 
-# {{{ POD
 
 
 =head1 TESTING
@@ -1738,7 +1609,6 @@ DBIx::SearchBuilder::Handle, DBIx::SearchBuilder::Record.
 
 =cut
 
-# }}}
 
 
 
