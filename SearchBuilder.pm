@@ -4,7 +4,7 @@ package DBIx::SearchBuilder;
 use strict;
 
 use vars qw($VERSION);
-$VERSION = "1.38";
+$VERSION = "1.39";
 
 use Clone qw();
 
@@ -709,13 +709,23 @@ sub Limit {
         VALUE           => undef,
         ALIAS           => undef,
         QUOTEVALUE      => 1,
-        ENTRYAGGREGATOR => 'or',
+        ENTRYAGGREGATOR => undef,
         CASESENSITIVE   => undef,
         OPERATOR        => '=',
         SUBCLAUSE       => undef,
         LEFTJOIN        => undef,
         @_    # get the real argumentlist
     );
+
+    if (not $args{'ENTRYAGGREGATOR'} ) {
+        if ( $args{'LEFTJOIN'} ) {
+            $args{'ENTRYAGGREGATOR'} = 'AND';
+            } else {
+
+            $args{'ENTRYAGGREGATOR'} = 'OR';
+            }
+    }
+
 
     my ($Alias);
 
@@ -882,8 +892,11 @@ sub _GenericRestriction {
     # $restriction to point htere. otherwise, lets construct normally
 
     if ( $args{'LEFTJOIN'} ) {
-        $restriction =
-          \$self->{'left_joins'}{ $args{'LEFTJOIN'} }{'criteria'}{"$Clause"};
+        if ($args{'ENTRYAGGREGATOR'} ) {
+            $self->{'left_joins'}{ $args{'LEFTJOIN'} }{'entry_aggregator'} = 
+                $args{'ENTRYAGGREGATOR'};
+        }
+        $restriction = \$self->{'left_joins'}{ $args{'LEFTJOIN'} }{'criteria'}{"$Clause"};
     }
     else {
         $restriction = \$self->{'restrictions'}{"$Clause"};
