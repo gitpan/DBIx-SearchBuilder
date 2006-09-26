@@ -9,9 +9,7 @@ use DBI;
 use Class::ReturnValue;
 use Encode;
 
-use vars qw($VERSION @ISA %DBIHandle $PrevHandle $DEBUG %TRANSDEPTH);
-
-$VERSION = '$Version$';
+use vars qw(@ISA %DBIHandle $PrevHandle $DEBUG %TRANSDEPTH);
 
 
 =head1 NAME
@@ -341,31 +339,46 @@ sub dbh {
 
 =head2 Insert $TABLE_NAME @KEY_VALUE_PAIRS
 
-Takes a table name and a set of key-value pairs in an array. splits the key value pairs, constructs an INSERT statement and performs the insert. Returns the row_id of this row.
+Takes a table name and a set of key-value pairs in an array.
+Splits the key value pairs, constructs an INSERT statement
+and performs the insert.
+
+Base class return statement handle object, while DB specific
+subclass should return row id.
 
 =cut
 
 sub Insert {
-  my($self, $table, @pairs) = @_;
-  my(@cols, @vals, @bind);
+    my $self = shift;
+    return $self->SimpleQuery( $self->InsertQueryString(@_) );
+}
 
-  #my %seen; #only the *first* value is used - allows drivers to specify default
-  while ( my $key = shift @pairs ) {
-    my $value = shift @pairs;
-    # next if $seen{$key}++;
-    push @cols, $key;
-    push @vals, '?';
-    push @bind, $value;  
-  }
+=head2 InsertQueryString $TABLE_NAME @KEY_VALUE_PAIRS
 
-  my $QueryString =
-    "INSERT INTO $table (". join(", ", @cols). ") VALUES ".
-    "(". join(", ", @vals). ")";
+Takes a table name and a set of key-value pairs in an array.
+Splits the key value pairs, constructs an INSERT statement
+and returns query string and set of bind values.
 
-    my $sth =  $self->SimpleQuery($QueryString, @bind);
-    return ($sth);
-  }
+This method is more useful for subclassing in DB specific
+handles. L</Insert> method is prefered for end users.
 
+=cut
+
+sub InsertQueryString {
+    my($self, $table, @pairs) = @_;
+    my(@cols, @vals, @bind);
+
+    while ( my $key = shift @pairs ) {
+        push @cols, $key;
+        push @vals, '?';
+        push @bind, shift @pairs;
+    }
+
+    my $QueryString = "INSERT INTO $table";
+    $QueryString .= " (". join(", ", @cols) .")";
+    $QueryString .= " VALUES (". join(", ", @vals). ")";
+    return ($QueryString, @bind);
+}
 
 =head2 UpdateRecordValue 
 

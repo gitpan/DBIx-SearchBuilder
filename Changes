@@ -1,5 +1,20 @@
 Revision history for Perl extension DBIx::SearchBuilder.
 
+1.45 Tue Sep 26 11:08:20 EDT 2006
+
+* Postgres fixes:
+** fix "$rec->Create();"
+** fix "$rec->Create( IntegerColumn => '' );"
+** fix "$rec->SetIntegerColumn( '' );"
+** add test
+
+* Cache changes
+** cleanup ::Record::Cachable
+** use cache in:
+    $a->LoadByCols(...);
+    $b->LoadById( $a->id );
+** add cache tests
+
 1.44
 * DBIx::SearchBuilder::Handle::DatabaseVersion enhancements
 

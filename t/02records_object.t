@@ -106,7 +106,10 @@ CREATE TEMPORARY TABLE Phones (
 
 package TestApp::Employee;
 
-use base qw/DBIx::SearchBuilder::Record/;
+use base $ENV{SB_TEST_CACHABLE}?
+    qw/DBIx::SearchBuilder::Record::Cachable/:
+    qw/DBIx::SearchBuilder::Record/;
+
 use vars qw/$VERSION/;
 $VERSION=0.01;
 
@@ -135,7 +138,9 @@ package TestApp::Phone;
 use vars qw/$VERSION/;
 $VERSION=0.01;
 
-use base qw/DBIx::SearchBuilder::Record/;
+use base $ENV{SB_TEST_CACHABLE}?
+    qw/DBIx::SearchBuilder::Record::Cachable/:
+    qw/DBIx::SearchBuilder::Record/;
 
 sub _Init {
     my $self = shift;
