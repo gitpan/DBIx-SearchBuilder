@@ -7,7 +7,7 @@ use warnings;
 use Carp qw(croak cluck);
 use DBI;
 use Class::ReturnValue;
-use Encode;
+use Encode qw();
 
 use vars qw(@ISA %DBIHandle $PrevHandle $DEBUG %TRANSDEPTH);
 
@@ -875,8 +875,8 @@ sub Join {
     my %args = (
         SearchBuilder => undef,
         TYPE          => 'normal',
-        FIELD1        => 'main',
-        ALIAS1        => undef,
+        ALIAS1        => 'main',
+        FIELD1        => undef,
         TABLE2        => undef,
         FIELD2        => undef,
         ALIAS2        => undef,
@@ -884,7 +884,6 @@ sub Join {
         @_
     );
 
-    my $string;
 
     my $alias;
 
@@ -897,10 +896,9 @@ sub Join {
         my @aliases = @{ $args{'SearchBuilder'}->{'aliases'} };
         my @new_aliases;
         foreach my $old_alias (@aliases) {
-            if ( $old_alias =~ /^(.*?) ($args{'ALIAS2'})$/ ) {
+            if ( $old_alias =~ /^(.*?) (\Q$args{'ALIAS2'}\E)$/ ) {
                 $args{'TABLE2'} = $1;
                 $alias = $2;
-
             }
             else {
                 push @new_aliases, $old_alias;
@@ -933,7 +931,8 @@ sub Join {
 
         }
 
-        if ( !$alias || $args{'ALIAS1'} ) {
+        unless ( $alias ) {
+            # XXX: this situation is really bug in the caller!!!
             return ( $self->_NormalJoin(%args) );
         }
         $args{'SearchBuilder'}->{'aliases'} = \@new_aliases;
@@ -944,31 +943,22 @@ sub Join {
 
     }
 
+    my $string;
     if ( $args{'TYPE'} =~ /LEFT/i ) {
-
         $string = " LEFT JOIN " . $args{'TABLE2'} . " $alias ";
-
     }
     else {
-
         $string = " JOIN " . $args{'TABLE2'} . " $alias ";
-
     }
 
+    my $meta = $args{'SearchBuilder'}->{'left_joins'}{"$alias"} ||= {};
+    $meta->{'alias_string'} = $string;
+    $meta->{'type'}         = uc $args{'TYPE'};
+    $meta->{'depends_on'}   = $args{'ALIAS1'};
 
-    my $criterion;
-    if ($args{'EXPRESSION'}) {
-        $criterion = $args{'EXPRESSION'};
-    } else {
-        $criterion = $args{'ALIAS1'}.".".$args{'FIELD1'};
-    }
-
-    $args{'SearchBuilder'}->{'left_joins'}{"$alias"}{'alias_string'} = $string;
-    $args{'SearchBuilder'}->{'left_joins'}{"$alias"}{'depends_on'}   =
-      $args{'ALIAS1'};
-    $args{'SearchBuilder'}->{'left_joins'}{"$alias"}{'criteria'}
-      { 'criterion' . $args{'SearchBuilder'}->{'criteria_count'}++ } =
-      " $alias.$args{'FIELD2'} = $criterion";
+    my $criterion = $args{'EXPRESSION'} || $args{'ALIAS1'}.".".$args{'FIELD1'};
+    $meta->{'criteria'}{ 'criterion' . $args{'SearchBuilder'}->{'criteria_count'}++ } =
+        [ { field => "$alias.$args{'FIELD2'}", op => '=', value => $criterion } ];
 
     return ($alias);
 }
@@ -991,11 +981,15 @@ sub _NormalJoin {
 
     if ( $args{'TYPE'} =~ /LEFT/i ) {
         my $alias = $sb->_GetAlias( $args{'TABLE2'} );
-        $sb->{'left_joins'}{"$alias"}{'alias_string'} =
-          " LEFT JOIN $args{'TABLE2'} $alias ";
-
-        $sb->{'left_joins'}{"$alias"}{'criteria'}{'base_criterion'} =
-          " $args{'ALIAS1'}.$args{'FIELD1'} = $alias.$args{'FIELD2'}";
+        my $meta = $sb->{'left_joins'}{"$alias"} ||= {};
+        $meta->{'alias_string'} = " LEFT JOIN $args{'TABLE2'} $alias ";
+        $meta->{'depends_on'}   = $args{'ALIAS1'};
+        $meta->{'type'}         = 'LEFT';
+        $meta->{'criteria'}{'base_criterion'} = [ {
+            field => "$args{'ALIAS1'}.$args{'FIELD1'}",
+            op => '=',
+            value => "$alias.$args{'FIELD2'}",
+        } ];
 
         return ($alias);
     }
@@ -1017,50 +1011,208 @@ sub _NormalJoin {
 sub _BuildJoins {
     my $self = shift;
     my $sb   = shift;
-    my %seen_aliases;
 
-    $seen_aliases{'main'} = 1;
+    $self->OptimizeJoins( SearchBuilder => $sb );
 
-   	# We don't want to get tripped up on a dependency on a simple alias. 
-    	foreach my $alias ( @{ $sb->{'aliases'}} ) {
-          if ( $alias =~ /^(.*?)\s+(.*?)$/ ) {
-              $seen_aliases{$2} = 1;
-          }
-    }
+    my $join_clause = join ", ", ($sb->Table ." main"), @{ $sb->{'aliases'} };
+    my %processed = map { /^\S+\s+(\S+)$/; $1 => 1 } @{ $sb->{'aliases'} };
+    $processed{'main'} = 1;
 
-    my $join_clause = $sb->Table . " main ";
+    # get a @list of joins that have not been processed yet, but depend on processed join
+    my $joins = $sb->{'left_joins'};
+    while ( my @list = grep !$processed{ $_ }
+            && $processed{ $joins->{ $_ }{'depends_on'} }, keys %$joins )
+    {
+        foreach my $join ( @list ) {
+            $processed{ $join }++;
 
-	
-    my @keys = ( keys %{ $sb->{'left_joins'} } );
-    my %seen;
+            my $meta = $joins->{ $join };
+            my $aggregator = $meta->{'entry_aggregator'} || 'AND';
 
-    while ( my $join = shift @keys ) {
-        my $aggregator = $sb->{'left_joins'}{$join}{'entry_aggregator'} 
-            || 'AND';
-
-        if ( ! $sb->{'left_joins'}{$join}{'depends_on'} || $seen_aliases{ $sb->{'left_joins'}{$join}{'depends_on'} } ) {
             $join_clause = "(" . $join_clause;
-            $join_clause .=
-              $sb->{'left_joins'}{$join}{'alias_string'} . " ON (";
-            $join_clause .=
-              join ( ") $aggregator ( ",
-                values %{ $sb->{'left_joins'}{$join}{'criteria'} } );
-            $join_clause .= ")) ";
-
-            $seen_aliases{$join} = 1;
+            $join_clause .= $meta->{'alias_string'} . " ON ";
+            my @tmp = map {
+                    ref($_)?
+                        $_->{'field'} .' '. $_->{'op'} .' '. $_->{'value'}:
+                        $_
+                }
+                map { ('(', @$_, ')', $aggregator) } values %{ $meta->{'criteria'} };
+            pop @tmp;
+            $join_clause .= join ' ', @tmp;
+            $join_clause .= ") ";
         }
-        else {
-            push ( @keys, $join );
-            die "Unsatisfied dependency chain in Joins @keys"
-              if $seen{"@keys"}++;
-        }
-
     }
-    return ( join ( ", ", ( $join_clause, @{ $sb->{'aliases'} } ) ) );
+
+    # here we could check if there is recursion in joins by checking that all joins
+    # are processed
+    if ( my @not_processed = grep !$processed{ $_ }, keys %$joins ) {
+        die "Unsatisfied dependency chain in joins @not_processed";
+    }
+    return $join_clause;
+}
+
+sub OptimizeJoins {
+    my $self = shift;
+    my %args = (SearchBuilder => undef, @_);
+    my $joins = $args{'SearchBuilder'}->{'left_joins'};
+
+    my %processed = map { /^\S+\s+(\S+)$/; $1 => 1 } @{ $args{'SearchBuilder'}->{'aliases'} };
+    $processed{ $_ }++ foreach grep $joins->{ $_ }{'type'} ne 'LEFT', keys %$joins;
+    $processed{'main'}++;
+
+    my @ordered;
+    # get a @list of joins that have not been processed yet, but depend on processed join
+    # if we are talking about forest then we'll get the second level of the forest,
+    # but we should process nodes on this level at the end, so we build FILO ordered list.
+    # finally we'll get ordered list with leafes in the beginning and top most nodes at
+    # the end.
+    while ( my @list = grep !$processed{ $_ }
+            && $processed{ $joins->{ $_ }{'depends_on'} }, keys %$joins )
+    {
+        unshift @ordered, @list;
+        $processed{ $_ }++ foreach @list;
+    }
+
+    foreach my $join ( @ordered ) {
+        next if $self->MayBeNull( SearchBuilder => $args{'SearchBuilder'}, ALIAS => $join );
+
+        $joins->{ $join }{'alias_string'} =~ s/^\s*LEFT\s+/ /;
+        $joins->{ $join }{'type'} = 'NORMAL';
+    }
+
+    # here we could check if there is recursion in joins by checking that all joins
+    # are processed
 
 }
 
+=head2 MayBeNull
 
+Takes a C<SearchBuilder> and C<ALIAS> in a hash and resturns
+true if restrictions of the query allow NULLs in a table joined with
+the ALIAS, otherwise returns false value which means that you can
+use normal join instead of left for the aliased table.
+
+Works only for queries have been built with L<DBIx::SearchBuilder/Join> and
+L<DBIx::SearchBuilder/Limit> methods, for other cases return true value to
+avoid fault optimizations.
+
+=cut
+
+sub MayBeNull {
+    my $self = shift;
+    my %args = (SearchBuilder => undef, ALIAS => undef, @_);
+    # if we have at least one subclause that is not generic then we should get out
+    # of here as we can't parse subclauses
+    return 1 if grep $_ ne 'generic_restrictions', keys %{ $args{'SearchBuilder'}->{'subclauses'} };
+
+    # build full list of generic conditions
+    my @conditions;
+    foreach ( grep @$_, values %{ $args{'SearchBuilder'}->{'restrictions'} } ) {
+        push @conditions, 'AND' if @conditions;
+        push @conditions, '(', @$_, ')';
+    }
+
+    # find tables that depends on this alias and add their join conditions
+    foreach my $join ( values %{ $args{'SearchBuilder'}->{'left_joins'} } ) {
+        # left joins on the left side so later we'll get 1 AND x expression
+        # which equal to x, so we just skip it
+        next if $join->{'type'} eq 'LEFT';
+        next unless $join->{'depends_on'} eq $args{'ALIAS'};
+
+        my @tmp = map { ('(', @$_, ')', $join->{'entry_aggregator'}) } values %{ $join->{'criteria'} };
+        pop @tmp;
+
+        @conditions = ('(', @conditions, ')', 'AND', '(', @tmp ,')');
+
+    }
+    return 1 unless @conditions;
+
+    # replace conditions with boolean result: 1 - allows nulls, 0 - not
+    # all restrictions on that don't act on required alias allow nulls
+    # otherwise only IS NULL operator 
+    foreach ( splice @conditions ) {
+        unless ( ref $_ ) {
+            push @conditions, $_;
+        } elsif ( $_->{'field'} =~ /^\Q$args{'ALIAS'}./ ) {
+            push @conditions, lc $_->{op} eq 'is';
+        } elsif ( $_->{'value'} && $_->{'value'} =~ /^\Q$args{'ALIAS'}./ ) {
+            push @conditions, 0;
+        } else {
+            push @conditions, 1;
+        }
+    }
+
+    # resturns index of closing paren by index of openning paren
+    my $closing_paren = sub {
+        my $i = shift;
+        my $count = 0;
+        for ( ; $i < @conditions; $i++ ) {
+            if ( $conditions[$i] eq '(' ) {
+                $count++;
+            }
+            elsif ( $conditions[$i] eq ')' ) {
+                $count--;
+            }
+            return $i unless $count;
+        }
+        die "lost in parens";
+    };
+
+    # solve boolean expression we have, an answer is our result
+    my @tmp = ();
+    while ( defined ( my $e = shift @conditions ) ) {
+        #warn "@tmp >>>$e<<< @conditions";
+        return $e if !@conditions && !@tmp;
+
+        unless ( $e ) {
+            if ( $conditions[0] eq ')' ) {
+                push @tmp, $e;
+                next;
+            }
+
+            my $aggreg = shift @conditions;
+            if ( $aggreg eq 'OR' ) {
+                # 0 OR x == x
+                next;
+            } elsif ( $aggreg eq 'AND' ) {
+                # 0 AND x == 0
+                my $close_p = $closing_paren->(0);
+                splice @conditions, 0, $close_p + 1, (0);
+            } else {
+                die "lost @tmp >>>$e $aggreg<<< @conditions";
+            }
+        } elsif ( $e eq '1' ) {
+            if ( $conditions[0] eq ')' ) {
+                push @tmp, $e;
+                next;
+            }
+
+            my $aggreg = shift @conditions;
+            if ( $aggreg eq 'OR' ) {
+                # 1 OR x == 1
+                my $close_p = $closing_paren->(0);
+                splice @conditions, 0, $close_p + 1, (1);
+            } elsif ( $aggreg eq 'AND' ) {
+                # 1 AND x == x
+                next;
+            } else {
+                die "lost @tmp >>>$e $aggreg<<< @conditions";
+            }
+        } elsif ( $e eq '(' ) {
+            if ( $conditions[1] eq ')' ) {
+                splice @conditions, 1, 1;
+            } else {
+                push @tmp, $e;
+            }
+        } elsif ( $e eq ')' ) {
+            unshift @conditions, @tmp, $e;
+            @tmp = ();
+        } else {
+            die "lost: @tmp >>>$e<<< @conditions";
+        }
+    }
+    return 1;
+}
 
 =head2 DistinctQuery STATEMENTREF 
 

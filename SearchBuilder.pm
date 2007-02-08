@@ -4,9 +4,10 @@ package DBIx::SearchBuilder;
 use strict;
 
 use vars qw($VERSION);
-$VERSION = "1.45";
+$VERSION = "1.45_01";
 
 use Clone qw();
+use Encode qw();
 
 =head1 NAME
 
@@ -147,6 +148,9 @@ sub CleanSlate {
 	restrictions
 	_open_parens
 	_close_parens
+    group_by
+    columns
+    criteria_count
     );
 
     #we have no limit statements. DoSearch won't work.
@@ -172,7 +176,8 @@ sub Clone
     $obj->{'must_redo_search'} = 1;
     $obj->{'itemscount'}       = 0;
     
-    $obj->{$_} = Clone::clone($obj->{$_}) for ( $self->_ClonedAttributes );
+    $obj->{ $_ } = Clone::clone( $obj->{ $_ } )
+        foreach grep exists $self->{ $_ }, $self->_ClonedAttributes;
     return $obj;
 }
 
@@ -193,6 +198,9 @@ sub _ClonedAttributes
         left_joins
         subclauses
         restrictions
+        order_by
+        group_by
+        columns
     );
 }
 
@@ -356,10 +364,10 @@ Returns true if this SearchBuilder will be joining multiple tables together.
 
 sub _isJoined {
     my $self = shift;
-    if (keys(%{$self->{'left_joins'}})) {
-        return(1);
+    if ( keys %{ $self->{'left_joins'} } ) {
+        return (1);
     } else {
-        return(@{$self->{'aliases'}});
+        return (@{ $self->{'aliases'} });
     }
 
 }
@@ -707,6 +715,24 @@ The default value is C<OR>.
 on some databases, such as postgres, setting CASESENSITIVE to 1 will make
 this search case sensitive
 
+=item SUBCLAUSE
+
+Subclause allows you to assign tags to Limit statements.  Statements with
+matching SUBCLAUSE tags will be grouped together in the final SQL statement.
+
+Example:
+
+Suppose you want to create Limit statments which would produce results
+the same as the following SQL:
+
+   SELECT * FROM Users WHERE EmailAddress OR Name OR RealName OR Email LIKE $query;
+
+You would use the following Limit statements:
+
+    $folks->Limit( FIELD => 'EmailAddress', OPERATOR => 'LIKE', VALUE => "$query", SUBCLAUSE => 'groupsearch');
+    $folks->Limit( FIELD => 'Name', OPERATOR => 'LIKE', VALUE => "$query", SUBCLAUSE => 'groupsearch');
+    $folks->Limit( FIELD => 'RealName', OPERATOR => 'LIKE', VALUE => "$query", SUBCLAUSE => 'groupsearch');
+
 =back
 
 =cut
@@ -727,7 +753,7 @@ sub Limit {
         @_    # get the real argumentlist
     );
 
-    if (not $args{'ENTRYAGGREGATOR'} ) {
+    unless ( $args{'ENTRYAGGREGATOR'} ) {
         if ( $args{'LEFTJOIN'} ) {
             $args{'ENTRYAGGREGATOR'} = 'AND';
             } else {
@@ -736,8 +762,6 @@ sub Limit {
             }
     }
 
-
-    my ($Alias);
 
     #since we're changing the search criteria, we need to redo the search
     $self->RedoSearch();
@@ -750,33 +774,25 @@ sub Limit {
         }
         elsif ( $args{'OPERATOR'} =~ /STARTSWITH/i ) {
             $args{'VALUE'}    = $args{'VALUE'} . "%";
-            $args{'OPERATOR'} =~ s/STARTSWITH/LIKE/i;
         }
         elsif ( $args{'OPERATOR'} =~ /ENDSWITH/i ) {
             $args{'VALUE'}    = "%" . $args{'VALUE'};
-            $args{'OPERATOR'} =~ s/ENDSWITH/LIKE/i;
-        } 
-	
-	$args{'OPERATOR'} =~ s/MATCHES/LIKE/i;  # MATCHES becomes LIKE, with no % stuff
+        }
+        $args{'OPERATOR'} =~ s/(?:MATCHES|ENDSWITH|STARTSWITH)/LIKE/i;
 
         #if we're explicitly told not to to quote the value or
         # we're doing an IS or IS NOT (null), don't quote the operator.
 
         if ( $args{'QUOTEVALUE'} && $args{'OPERATOR'} !~ /IS/i ) {
-            my $tmp = $self->_Handle->dbh->quote( $args{'VALUE'} );
+            my $turn_utf = Encode::is_utf8( $args{'VALUE'} );
+            $args{'VALUE'} = $self->_Handle->dbh->quote( $args{'VALUE'} );
 
             # Accomodate DBI drivers that don't understand UTF8
-	    if ($] >= 5.007) {
-	        require Encode;
-	        if( Encode::is_utf8( $args{'VALUE'} ) ) {
-	            Encode::_utf8_on( $tmp );
-	        }
-            }
-	    $args{'VALUE'} = $tmp;
+            Encode::_utf8_on( $args{'VALUE'} ) if $turn_utf;
         }
     }
 
-    $Alias = $self->_GenericRestriction(%args);
+    my $Alias = $self->_GenericRestriction(%args);
 
     warn "No table alias set!"
       unless $Alias;
@@ -849,8 +865,7 @@ sub _GenericRestriction {
     #If we're performing a left join, we really want the alias to be the
     #left join criterion.
 
-    if (    ( defined $args{'LEFTJOIN'} )
-         && ( !defined $args{'ALIAS'} ) ) {
+    if ( defined $args{'LEFTJOIN'} && !defined $args{'ALIAS'} ) {
         $args{'ALIAS'} = $args{'LEFTJOIN'};
     }
 
@@ -885,23 +900,19 @@ sub _GenericRestriction {
     my $QualifiedField = $args{'ALIAS'} . "." . $args{'FIELD'};
     my $ClauseId = $args{'SUBCLAUSE'} || $QualifiedField;
 
-    print STDERR "$self->_GenericRestriction QualifiedField=$QualifiedField\n"
-      if ( $self->DEBUG );
-
-
     # If we're trying to get a leftjoin restriction, lets set
     # $restriction to point htere. otherwise, lets construct normally
 
-    my ($restriction);
+    my $restriction;
     if ( $args{'LEFTJOIN'} ) {
         if ( $args{'ENTRYAGGREGATOR'} ) {
             $self->{'left_joins'}{ $args{'LEFTJOIN'} }{'entry_aggregator'} = 
                 $args{'ENTRYAGGREGATOR'};
         }
-        $restriction = \$self->{'left_joins'}{ $args{'LEFTJOIN'} }{'criteria'}{ $ClauseId };
+        $restriction = $self->{'left_joins'}{ $args{'LEFTJOIN'} }{'criteria'}{ $ClauseId } ||= [];
     }
     else {
-        $restriction = \$self->{'restrictions'}{ $ClauseId };
+        $restriction = $self->{'restrictions'}{ $ClauseId } ||= [];
     }
 
     # If it's a new value or we're overwriting this sort of restriction,
@@ -916,19 +927,23 @@ sub _GenericRestriction {
 
     }
 
-    my $clause = "($QualifiedField $args{'OPERATOR'} $args{'VALUE'})";
+    my $clause = {
+        field => $QualifiedField,
+        op => $args{'OPERATOR'},
+        value => $args{'VALUE'},
+    };
 
     # Juju because this should come _AFTER_ the EA
-    my $prefix = "";
+    my @prefix;
     if ( $self->{_open_parens}{ $ClauseId } ) {
-        $prefix = " ( " x delete $self->{_open_parens}{ $ClauseId };
+        @prefix = ('(') x delete $self->{_open_parens}{ $ClauseId };
     }
 
-    if ( lc( $args{'ENTRYAGGREGATOR'} || "" ) eq 'none' || !$$restriction ) {
-        $$restriction = $prefix . $clause;
+    if ( lc( $args{'ENTRYAGGREGATOR'} || "" ) eq 'none' || !@$restriction ) {
+        @$restriction = (@prefix, $clause);
     }
     else {
-        $$restriction .= " ". $args{'ENTRYAGGREGATOR'} . " " . $prefix . $clause;
+        push @$restriction, $args{'ENTRYAGGREGATOR'}, @prefix, $clause;
     }
 
     return ( $args{'ALIAS'} );
@@ -937,20 +952,15 @@ sub _GenericRestriction {
 
 
 sub _OpenParen {
-    my ( $self, $clause ) = @_;
+    my ($self, $clause) = @_;
     $self->{_open_parens}{ $clause }++;
 }
 
 # Immediate Action
 sub _CloseParen {
     my ( $self, $clause ) = @_;
-    my $restriction = \$self->{'restrictions'}{ $clause };
-    if ( !$$restriction ) {
-        $$restriction = " ) ";
-    }
-    else {
-        $$restriction .= " ) ";
-    }
+    my $restriction = ($self->{'restrictions'}{ $clause } ||= []);
+    push @$restriction, ')';
 }
 
 
@@ -993,13 +1003,20 @@ sub _WhereClause {
 sub _CompileGenericRestrictions {
     my $self = shift;
 
-    $self->{'subclauses'}{'generic_restrictions'} = '';
-
     my $result = '';
     #Go through all the restrictions of this type. Buld up the generic subclause
-    foreach my $restriction ( sort keys %{ $self->{'restrictions'} } ) {
+    foreach my $restriction ( grep @$_, values %{ $self->{'restrictions'} } ) {
         $result .= " AND " if $result;
-        $result .= "(" . $self->{'restrictions'}{ $restriction } . ")";
+        $result .= '(';
+        foreach my $entry ( @$restriction ) {
+            unless ( ref $entry ) {
+                $result .= ' '. $entry . ' ';
+            }
+            else {
+                $result .= join ' ', @{$entry}{qw(field op value)};
+            }
+        }
+        $result .= ')';
     }
     return ($self->{'subclauses'}{'generic_restrictions'} = $result);
 }
@@ -1450,18 +1467,7 @@ sub IsLast {
 
 
 
-sub DEBUG {
-    my $self = shift;
-    if (@_) {
-        $self->{'DEBUG'} = shift;
-    }
-    return ( $self->{'DEBUG'} );
-}
-
-
-
-
-
+sub DEBUG { warn "DEBUG is deprecated" }
 
 
 =head2 Column { FIELD => undef } 
