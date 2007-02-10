@@ -943,21 +943,19 @@ sub Join {
 
     }
 
-    my $string;
+    my $meta = $args{'SearchBuilder'}->{'left_joins'}{"$alias"} ||= {};
     if ( $args{'TYPE'} =~ /LEFT/i ) {
-        $string = " LEFT JOIN " . $args{'TABLE2'} . " $alias ";
+        $meta->{'alias_string'} = " LEFT JOIN " . $args{'TABLE2'} . " $alias ";
+        $meta->{'type'} = 'LEFT';
     }
     else {
-        $string = " JOIN " . $args{'TABLE2'} . " $alias ";
+        $meta->{'alias_string'} = " JOIN " . $args{'TABLE2'} . " $alias ";
+        $meta->{'type'} = 'NORMAL';
     }
-
-    my $meta = $args{'SearchBuilder'}->{'left_joins'}{"$alias"} ||= {};
-    $meta->{'alias_string'} = $string;
-    $meta->{'type'}         = uc $args{'TYPE'};
-    $meta->{'depends_on'}   = $args{'ALIAS1'};
+    $meta->{'depends_on'} = $args{'ALIAS1'};
 
     my $criterion = $args{'EXPRESSION'} || $args{'ALIAS1'}.".".$args{'FIELD1'};
-    $meta->{'criteria'}{ 'criterion' . $args{'SearchBuilder'}->{'criteria_count'}++ } =
+    $meta->{'criteria'}{'base_criterion'} =
         [ { field => "$alias.$args{'FIELD2'}", op => '=', value => $criterion } ];
 
     return ($alias);
@@ -1029,7 +1027,6 @@ sub _BuildJoins {
             my $meta = $joins->{ $join };
             my $aggregator = $meta->{'entry_aggregator'} || 'AND';
 
-            $join_clause = "(" . $join_clause;
             $join_clause .= $meta->{'alias_string'} . " ON ";
             my @tmp = map {
                     ref($_)?
@@ -1039,7 +1036,6 @@ sub _BuildJoins {
                 map { ('(', @$_, ')', $aggregator) } values %{ $meta->{'criteria'} };
             pop @tmp;
             $join_clause .= join ' ', @tmp;
-            $join_clause .= ") ";
         }
     }
 
