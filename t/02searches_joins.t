@@ -7,7 +7,7 @@ use Test::More;
 BEGIN { require "t/utils.pl" }
 our (@AvailableDrivers);
 
-use constant TESTS_PER_DRIVER => 42;
+use constant TESTS_PER_DRIVER => 47;
 
 my $total = scalar(@AvailableDrivers) * TESTS_PER_DRIVER;
 plan tests => $total;
@@ -130,6 +130,28 @@ diag "main <- alias <- join" if $ENV{'TEST_VERBOSE'};
         "joined table"
     );
     $users_obj->Limit( ALIAS => $groups_alias, FIELD => 'Name', VALUE => 'Developers' );
+    is( $users_obj->Count, 3, "three members" );
+}
+
+diag "main <- alias <- join into main" if $ENV{'TEST_VERBOSE'};
+{
+    # DBs' parsers don't like: FROM X, Y JOIN C ON C.f = X.f
+    $users_obj->CleanSlate;
+    is_deeply( $users_obj, $clean_obj, 'after CleanSlate looks like new object');
+    ok( !$users_obj->_isJoined, "new object isn't joined");
+
+    ok( my $groups_alias = $users_obj->NewAlias( 'Groups' ), "new alias" );
+    ok( my $g2u_alias = $users_obj->Join(
+            ALIAS1 => 'main',
+            FIELD1 => 'id',
+            TABLE2 => 'UsersToGroups',
+            FIELD2 => 'UserId',
+        ),
+        "joined table"
+    );
+    $users_obj->Limit( ALIAS => $g2u_alias, FIELD => 'GroupId', VALUE => "$groups_alias.id", QUOTEVALUE => 0);
+    $users_obj->Limit( ALIAS => $groups_alias, FIELD => 'Name', VALUE => 'Developers' );
+    #diag $users_obj->BuildSelectQuery;
     is( $users_obj->Count, 3, "three members" );
 }
 
@@ -257,6 +279,34 @@ CREATE TEMPORARY TABLE Groups (
 ) },
 ]
 }
+
+sub schema_oracle { [
+    "CREATE SEQUENCE Users_seq",
+    "CREATE TABLE Users (
+        id integer CONSTRAINT Users_Key PRIMARY KEY,
+        Login varchar(36)
+    )",
+    "CREATE SEQUENCE UsersToGroups_seq",
+    "CREATE TABLE UsersToGroups (
+        id integer CONSTRAINT UsersToGroups_Key PRIMARY KEY,
+        UserId integer,
+        GroupId integer
+    )",
+    "CREATE SEQUENCE Groups_seq",
+    "CREATE TABLE Groups (
+        id integer CONSTRAINT Groups_Key PRIMARY KEY,
+        Name varchar(36)
+    )",
+] }
+
+sub cleanup_schema_oracle { [
+    "DROP SEQUENCE Users_seq",
+    "DROP TABLE Users", 
+    "DROP SEQUENCE Groups_seq",
+    "DROP TABLE Groups", 
+    "DROP SEQUENCE UsersToGroups_seq",
+    "DROP TABLE UsersToGroups", 
+] }
 
 package TestApp::User;
 

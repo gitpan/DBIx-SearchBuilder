@@ -7,7 +7,7 @@ use warnings;
 
 use base qw/DBIx::SearchBuilder::Handle/;
 
-use DBD::Oracle qw(:ora_types);
+use DBD::Oracle qw(:ora_types ORA_OCI);
          
 =head1 NAME
 
@@ -249,19 +249,21 @@ sub DistinctQuery {
 
     # Wrapp select query in a subselect as Oracle doesn't allow
     # DISTINCT against CLOB/BLOB column types.
-    # Joop van de Wege: Thats correct but ORDER_BY column not in main doesn't need GROUP_BY
-    # so drop the group_by lines and add the order_by part but without the min()
     if ($sb->_OrderClause =~ /(?<!main)\./) {
+        # If we are ordering by something not in 'main', we need to GROUP
+        # BY and adjust the ORDER_BY accordingly
+        local $sb->{group_by} = [@{$sb->{group_by} || []}, {FIELD => 'id'}];
+        local $sb->{order_by} = [map {($_->{ALIAS} and $_->{ALIAS} ne "main") ? {%{$_}, FIELD => "min(".$_->{FIELD}.")"}: $_} @{$sb->{order_by}}];
+        my $group = $sb->_GroupClause;
         my $order = $sb->_OrderClause;
-        $$statementref = "SELECT main.* FROM ( SELECT main.id FROM $$statementref $order ) distinctquery,"
-            ." $table main WHERE (main.id = distinctquery.id)";
+        $$statementref = "SELECT main.* FROM ( SELECT main.id FROM $$statementref $group $order ) distinctquery, $table main WHERE (main.id = distinctquery.id)";
     } else {
-        $$statementref = "SELECT main.* FROM ( SELECT DISTINCT main.id FROM $$statementref ) distinctquery,"
-            ." $table main WHERE (main.id = distinctquery.id) ";
+        $$statementref = "SELECT main.* FROM ( SELECT DISTINCT main.id FROM $$statementref ) distinctquery, $table main WHERE (main.id = distinctquery.id) ";
         $$statementref .= $sb->_GroupClause;
         $$statementref .= $sb->_OrderClause;
     }
 }
+
 
 
 
@@ -277,6 +279,15 @@ sub BinarySafeBLOBs {
     return(undef);
 }
 
+=head2 DatabaseVersion
+
+Returns value of ORA_OCI constant, see L<DBI/Constants>.
+
+=cut
+
+sub DatabaseVersion {
+    return ''. ORA_OCI;
+}
 
 1;
 
