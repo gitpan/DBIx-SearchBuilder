@@ -8,6 +8,7 @@ name: DBIx-SearchBuilder
 no_index: 
   directory: 
     - t
+    - ex
     - inc
     - t
 requires: 
@@ -17,4 +18,4 @@ requires:
   DBI: 0
   Encode: 0
   Want: 0
-version: 1.46
+version: 1.47
