@@ -4,7 +4,7 @@ package DBIx::SearchBuilder;
 use strict;
 use warnings;
 
-our $VERSION = "1.51";
+our $VERSION = "1.52";
 
 use Clone qw();
 use Encode qw();
@@ -1082,19 +1082,20 @@ sub _OrderClause {
         else {
 	    $rowhash{'ORDER'} = "ASC";
         }
+        $rowhash{'ALIAS'} = 'main' unless defined $rowhash{'ALIAS'};
 
-        if ( ($rowhash{'ALIAS'}) and
-	     ($rowhash{'FIELD'}) and
-             ($rowhash{'ORDER'}) ) {
+        if ( defined $rowhash{'ALIAS'} and
+	     $rowhash{'FIELD'} and
+             $rowhash{'ORDER'} ) {
 
-	    if ($rowhash{'FIELD'} =~ /^(\w+\()(.*\))$/) {
+	    if ( length $rowhash{'ALIAS'} && $rowhash{'FIELD'} =~ /^(\w+\()(.*\))$/ ) {
 		# handle 'FUNCTION(FIELD)' formatted fields
 		$rowhash{'ALIAS'} = $1 . $rowhash{'ALIAS'};
 		$rowhash{'FIELD'} = $2;
 	    }
 
             $clause .= ($clause ? ", " : " ");
-            $clause .= $rowhash{'ALIAS'} . ".";
+            $clause .= $rowhash{'ALIAS'} . "." if length $rowhash{'ALIAS'};
             $clause .= $rowhash{'FIELD'} . " ";
             $clause .= $rowhash{'ORDER'};
         }
