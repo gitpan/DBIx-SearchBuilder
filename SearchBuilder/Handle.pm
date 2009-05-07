@@ -9,7 +9,7 @@ use DBI;
 use Class::ReturnValue;
 use Encode qw();
 
-use vars qw(@ISA %DBIHandle $PrevHandle $DEBUG %TRANSDEPTH);
+use vars qw(@ISA %DBIHandle $PrevHandle $DEBUG %TRANSDEPTH %FIELDS_IN_TABLE);
 
 
 =head1 NAME
@@ -132,9 +132,10 @@ sub _UpgradeHandle {
     
     my $driver = shift;
     my $class = 'DBIx::SearchBuilder::Handle::' . $driver;
+    local $@;
     eval "require $class";
     return if $@;
-    
+
     bless $self, $class;
     return 1;
 }
@@ -331,7 +332,10 @@ sub dbh {
   my $self=shift;
   
   #If we are setting the database handle, set it.
-  $DBIHandle{$self} = $PrevHandle = shift if (@_);
+  if ( @_ ) {
+      $DBIHandle{$self} = $PrevHandle = shift;
+      %FIELDS_IN_TABLE = ();
+  }
 
   return($DBIHandle{$self} ||= $PrevHandle);
 }
@@ -885,6 +889,7 @@ sub Join {
         ALIAS1        => 'main',
         FIELD1        => undef,
         TABLE2        => undef,
+        COLLECTION2   => undef,
         FIELD2        => undef,
         ALIAS2        => undef,
         EXPRESSION    => undef,
@@ -943,11 +948,37 @@ sub Join {
             return ( $self->_NormalJoin(%args) );
         }
         $args{'SearchBuilder'}->{'aliases'} = \@new_aliases;
-    }
+    } elsif ( $args{'COLLECTION2'} ) {
+        # We're joining to a pre-limited collection.  We need to take
+        # all clauses in the other collection, munge 'main.' to a new
+        # alias, apply them locally, then proceed as usual.
+        my $collection = delete $args{'COLLECTION2'};
+        $alias = $args{ALIAS2} = $args{'SearchBuilder'}->_GetAlias( $collection->Table );
+        $args{TABLE2} = $collection->Table;
 
-    else {
+        eval {$collection->_ProcessRestrictions}; # RT hate
+
+        # Move over unused aliases
+        push @{$args{SearchBuilder}{aliases}}, @{$collection->{aliases}};
+
+        # Move over joins, as well
+        for my $join (keys %{$collection->{left_joins}}) {
+            my %alias = %{$collection->{left_joins}{$join}};
+            $alias{depends_on} = $alias if $alias{depends_on} eq "main";
+            $alias{criteria} = $self->_RenameRestriction(
+                RESTRICTIONS => $alias{criteria},
+                NEW          => $alias
+            );
+            $args{SearchBuilder}{left_joins}{$join} = \%alias;
+        }
+
+        my $restrictions = $self->_RenameRestriction(
+            RESTRICTIONS => $collection->{restrictions},
+            NEW          => $alias
+        );
+        $args{SearchBuilder}{restrictions}{$_} = $restrictions->{$_} for keys %{$restrictions};
+    } else {
         $alias = $args{'SearchBuilder'}->_GetAlias( $args{'TABLE2'} );
-
     }
 
     my $meta = $args{'SearchBuilder'}->{'left_joins'}{"$alias"} ||= {};
@@ -966,6 +997,35 @@ sub Join {
         [ { field => "$alias.$args{'FIELD2'}", op => '=', value => $criterion } ];
 
     return ($alias);
+}
+
+sub _RenameRestriction {
+    my $self = shift;
+    my %args = (
+        RESTRICTIONS => undef,
+        OLD          => "main",
+        NEW          => undef,
+        @_,
+    );
+
+    my %return;
+    for my $key ( keys %{$args{RESTRICTIONS}} ) {
+        my $newkey = $key;
+        $newkey =~ s/^\Q$args{OLD}\E\./$args{NEW}./;
+        my @parts;
+        for my $part ( @{ $args{RESTRICTIONS}{$key} } ) {
+            if ( ref $part ) {
+                my %part = %{$part};
+                $part{field} =~ s/^\Q$args{OLD}\E\./$args{NEW}./;
+                $part{value} =~ s/^\Q$args{OLD}\E\./$args{NEW}./;
+                push @parts, \%part;
+            } else {
+                push @parts, $part;
+            }
+        }
+        $return{$newkey} = \@parts;
+    }
+    return \%return;
 }
 
 sub _NormalJoin {
@@ -1252,6 +1312,22 @@ sub DistinctCount {
     # Prepend select query for DBs which allow DISTINCT on all column types.
     $$statementref = "SELECT COUNT(DISTINCT main.id) FROM $$statementref";
 
+}
+
+sub Fields {
+    my $self  = shift;
+    my $table = shift;
+
+    unless ( keys %FIELDS_IN_TABLE ) {
+        my $sth = $self->dbh->column_info( undef, '', '%', '%' )
+            or return ();
+        my $info = $sth->fetchall_arrayref({});
+        foreach my $e ( @$info ) {
+            push @{ $FIELDS_IN_TABLE{ lc $e->{'TABLE_NAME'} } ||= [] }, lc $e->{'COLUMN_NAME'};
+        }
+    }
+
+    return @{ $FIELDS_IN_TABLE{ lc $table } || [] };
 }
 
 
