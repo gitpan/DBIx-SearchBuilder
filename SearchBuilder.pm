@@ -4,7 +4,7 @@ package DBIx::SearchBuilder;
 use strict;
 use warnings;
 
-our $VERSION = "1.55";
+our $VERSION = "1.55_01";
 
 use Clone qw();
 use Encode qw();
@@ -430,11 +430,19 @@ sub BuildSelectQuery {
       if ( $self->_isLimited > 0 );
 
     # DISTINCT query only required for multi-table selects
-    if ($self->_isJoined) {
-        $self->_DistinctQuery(\$QueryString);
-    } else {
+    # when we have group by clause then the result set is distinct as
+    # it must contain only columns we group by or results of aggregate
+    # functions which give one result per group, so we can skip DISTINCTing
+    if ( my $clause = $self->_GroupClause ) {
         $QueryString = "SELECT main.* FROM $QueryString";
-        $QueryString .= $self->_GroupClause;
+        $QueryString .= $clause;
+        $QueryString .= $self->_OrderClause;
+    }
+    elsif ($self->_isJoined) {
+        $self->_DistinctQuery(\$QueryString);
+    }
+    else {
+        $QueryString = "SELECT main.* FROM $QueryString";
         $QueryString .= $self->_OrderClause;
     }
 
