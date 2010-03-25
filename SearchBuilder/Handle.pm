@@ -678,7 +678,8 @@ sub _MakeClauseCaseInsensitive {
     my $operator = shift;
     my $value = shift;
 
-    if ($value !~ /^\d+$/) { # don't downcase integer values
+    # don't downcase integer values and things that looks like dates
+    if ($value !~ /^['"]?[-\d: ]+['"]$/) {
         $field = "lower($field)";
         $value = lc($value);
     }
@@ -1196,10 +1197,15 @@ sub MayBeNull {
     foreach ( splice @conditions ) {
         unless ( ref $_ ) {
             push @conditions, $_;
-        } elsif ( $_->{'field'} =~ /^\Q$args{'ALIAS'}./ ) {
+        } elsif ( rindex( $_->{'field'}, "$args{'ALIAS'}.", 0 ) == 0 ) {
+            # field is alias.xxx op ... and only IS op allows NULLs
             push @conditions, lc $_->{op} eq 'is';
-        } elsif ( $_->{'value'} && $_->{'value'} =~ /^\Q$args{'ALIAS'}./ ) {
+        } elsif ( $_->{'value'} && rindex( $_->{'value'}, "$args{'ALIAS'}.", 0 ) == 0 ) {
+            # value is alias.xxx so it can not be IS op
             push @conditions, 0;
+        } elsif ( $_->{'field'} =~ /^(?i:lower)\(\s*\Q$args{'ALIAS'}\./ ) {
+            # handle 'LOWER(alias.xxx) OP VALUE' we use for case insensetive
+            push @conditions, lc $_->{op} eq 'is';
         } else {
             push @conditions, 1;
         }

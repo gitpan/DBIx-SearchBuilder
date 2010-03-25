@@ -4,7 +4,7 @@ package DBIx::SearchBuilder;
 use strict;
 use warnings;
 
-our $VERSION = "1.56";
+our $VERSION = "1.56_01";
 
 use Clone qw();
 use Encode qw();
@@ -128,7 +128,6 @@ sub CleanSlate {
     my $self = shift;
     $self->RedoSearch();
     $self->{'itemscount'}       = 0;
-    $self->{'where_clause'}     = "";
     $self->{'limit_clause'}     = "";
     $self->{'order'}            = "";
     $self->{'alias_count'}      = 0;
@@ -816,40 +815,6 @@ sub Limit {
 
 
 
-=head2 ShowRestrictions
-
-Returns the current object's proposed WHERE clause. 
-
-Deprecated.
-
-=cut
-
-sub ShowRestrictions {
-    my $self = shift;
-    $self->_CompileGenericRestrictions();
-    $self->_CompileSubClauses();
-    return ( $self->{'where_clause'} );
-
-}
-
-
-
-=head2 ImportRestrictions
-
-Replaces the current object's WHERE clause with the string passed as its argument.
-
-Deprecated
-
-=cut
-
-#import a restrictions clause
-sub ImportRestrictions {
-    my $self = shift;
-    $self->{'where_clause'} = shift;
-}
-
-
-
 sub _GenericRestriction {
     my $self = shift;
     my %args = ( TABLE           => $self->Table,
@@ -1002,7 +967,6 @@ sub _WhereClause {
 }
 
 
-
 #Compile the restrictions to a WHERE Clause
 
 sub _CompileGenericRestrictions {
@@ -1025,9 +989,6 @@ sub _CompileGenericRestrictions {
     }
     return ($self->{'subclauses'}{'generic_restrictions'} = $result);
 }
-
-
-
 
 
 =head2 OrderBy PARAMHASH
@@ -1111,20 +1072,6 @@ sub _OrderClause {
     return $clause;
 }
 
-
-
-
-
-=head2 GroupBy  (DEPRECATED)
-
-Alias for the GroupByCols method.
-
-=cut
-
-sub GroupBy { (shift)->GroupByCols( @_ ) }
-
-
-
 =head2 GroupByCols ARRAY_OF_HASHES
 
 Each hash contains the keys ALIAS and FIELD. ALIAS defaults to 'main' if ignored.
@@ -1138,7 +1085,6 @@ sub GroupByCols {
     $self->{'group_by'} = \@args;
     $self->RedoSearch();
 }
-
 
 =head2 _GroupClause
 
@@ -1179,10 +1125,6 @@ sub _GroupClause {
 	return '';
     }
 }
-
-
-
-
 
 =head2 NewAlias
 
@@ -1267,80 +1209,102 @@ sub Join {
 
 }
 
+=head2 Pages: size and changing
 
+Use L</RowsPerPage> to set size of pages. L</NextPage>,
+L</PrevPage>, L</FirstPage> or L</GotoPage> to change
+pages. L</FirstRow> to do tricky stuff.
 
+=head3 RowsPerPage
 
+Get or set the number of rows returned by the database.
+
+Takes an optional integer which restricts the # of rows returned
+in a result. Zero or undef argument flush back to "return all
+records matching current conditions".
+
+Returns the current page size.
+
+=cut
+
+sub RowsPerPage {
+    my $self = shift;
+
+    if ( @_ && ($_[0]||0) != $self->{'show_rows'} ) {
+        $self->{'show_rows'} = shift || 0;
+        $self->RedoSearch;
+    }
+
+    return ( $self->{'show_rows'} );
+}
+
+=head3 NextPage
+
+Turns one page forward.
+
+=cut
 
 sub NextPage {
     my $self = shift;
-    $self->FirstRow( $self->FirstRow + $self->RowsPerPage );
+    $self->FirstRow( $self->FirstRow + 1 + $self->RowsPerPage );
 }
 
+=head3 PrevPage
 
-sub FirstPage {
-    my $self = shift;
-    $self->FirstRow(1);
-}
+Turns one page backwards.
 
-
-
-
+=cut
 
 sub PrevPage {
     my $self = shift;
-    if ( ( $self->FirstRow - $self->RowsPerPage ) > 1 ) {
-        $self->FirstRow( $self->FirstRow - $self->RowsPerPage );
+    if ( ( $self->FirstRow - $self->RowsPerPage ) > 0 ) {
+        $self->FirstRow( 1 + $self->FirstRow - $self->RowsPerPage );
     }
     else {
         $self->FirstRow(1);
     }
 }
 
+=head3 FirstPage
 
+Jumps to the first page.
+
+=cut
+
+sub FirstPage {
+    my $self = shift;
+    $self->FirstRow(1);
+}
+
+=head3 GotoPage
+
+Takes an integer number and jumps to that page or first page if
+number ommitted. Numbering starts from zero.
+
+=cut
 
 sub GotoPage {
     my $self = shift;
-    my $page = shift;
+    my $page = shift || 0;
 
-    if ( $self->RowsPerPage ) {
-    	$self->FirstRow( 1 + ( $self->RowsPerPage * $page ) );
-    } else {
-        $self->FirstRow(1);
-    }
+    $self->FirstRow( 1 + $self->RowsPerPage * $page );
 }
 
-
-
-=head2 RowsPerPage
-
-Limits the number of rows returned by the database.
-Optionally, takes an integer which restricts the # of rows returned in a result
-Returns the number of rows the database should display.
-
-=cut
-
-sub RowsPerPage {
-    my $self = shift;
-    $self->{'show_rows'} = shift if (@_);
-
-    return ( $self->{'show_rows'} );
-}
-
-
-
-=head2 FirstRow
+=head3 FirstRow
 
 Get or set the first row of the result set the database should return.
 Takes an optional single integer argrument. Returns the currently set integer
-first row that the database should return.
+minus one (this is historical issue).
 
+Usually you don't need this method. Use L</RowsPerPage>, L</NextPage> and other
+methods to walk pages. It only may be helpful to get 10 records starting from
+5th.
 
 =cut
 
-# returns the first row
 sub FirstRow {
     my $self = shift;
-    if (@_) {
+    if (@_ && ($_[0]||1) != ($self->{'first_row'}+1) ) {
         $self->{'first_row'} = shift;
 
         #SQL starts counting at 0
@@ -1351,9 +1315,6 @@ sub FirstRow {
     }
     return ( $self->{'first_row'} );
 }
-
-
-
 
 
 =head2 _ItemsCounter
@@ -1368,14 +1329,11 @@ sub _ItemsCounter {
 }
 
 
-
 =head2 Count
 
 Returns the number of records in the set.
 
 =cut
-
-
 
 sub Count {
     my $self = shift;
@@ -1407,7 +1365,7 @@ sub Count {
 =head2 CountAll
 
 Returns the total number of potential records in the set, ignoring any
-LimitClause.
+L</RowsPerPage> settings.
 
 =cut
 
@@ -1462,8 +1420,6 @@ sub CountAll {
 }
 
 
-
-
 =head2 IsLast
 
 Returns true if the current row is the last record in the set.
@@ -1482,10 +1438,6 @@ sub IsLast {
         return (0);
     }
 }
-
-
-
-sub DEBUG { warn "DEBUG is deprecated" }
 
 
 =head2 Column { FIELD => undef } 
@@ -1555,7 +1507,6 @@ sub Columns {
 }
 
 
-
 =head2 Fields TABLE
 
 Return a list of fields in TABLE, lowercased.
@@ -1567,8 +1518,6 @@ TODO: Why are they lowercased?
 sub Fields {
     return (shift)->_Handle->Fields( @_ );
 }
-
-
 
 
 =head2 HasField  { TABLE => undef, FIELD => undef }
@@ -1590,7 +1539,6 @@ sub HasField {
 }
 
 
-
 =head2 Table [TABLE]
 
 If called with an argument, sets this collection's table.
@@ -1599,16 +1547,51 @@ Always returns this collection's table.
 
 =cut
 
-sub SetTable {
-    my $self = shift;
-    return $self->Table(@_);
-}
-
 sub Table {
     my $self = shift;
     $self->{table} = shift if (@_);
     return $self->{table};
 }
+
+=head1 DEPRECATED METHODS
+
+=head2 GroupBy
+
+DEPRECATED. Alias for the L</GroupByCols> method.
+
+=cut
+
+sub GroupBy { (shift)->GroupByCols( @_ ) }
+
+=head2 SetTable
+
+DEPRECATED. Alias for the L</Table> method.
+
+=cut
+
+sub SetTable {
+    my $self = shift;
+    return $self->Table(@_);
+}
+
+=head2 ShowRestrictions
+
+DEPRECATED AND DOES NOTHING.
+
+=cut
+
+sub ShowRestrictions { }
+
+=head2 ImportRestrictions
+
+DEPRECATED AND DOES NOTHING.
+
+=cut
+
+sub ImportRestrictions { }
+
+# not even documented
+sub DEBUG { warn "DEBUG is deprecated" }
 
 
 if( eval { require capitalization } ) {
