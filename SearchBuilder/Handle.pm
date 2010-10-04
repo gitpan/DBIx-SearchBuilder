@@ -181,9 +181,9 @@ sub BuildDSN {
     Returns the DSN for this database connection.
 
 =cut
+
 sub DSN {
-    my $self = shift;
-    return($self->{'dsn'});
+    return shift->{'dsn'};
 }
 
 
@@ -252,7 +252,7 @@ sub _LogSQLStatement {
     my $statement = shift;
     my $duration = shift;
     my @bind = @_;
-    push @{$self->{'StatementLog'}} , ([Time::HiRes::time(), $statement, [@bind], $duration]);
+    push @{$self->{'StatementLog'}} , ([Time::HiRes::time(), $statement, [@bind], $duration, Carp::longmess("Executed SQL query")]);
 
 }
 
@@ -1088,9 +1088,11 @@ sub _BuildJoins {
 
     # get a @list of joins that have not been processed yet, but depend on processed join
     my $joins = $sb->{'left_joins'};
-    while ( my @list = grep !$processed{ $_ }
-            && $processed{ $joins->{ $_ }{'depends_on'} }, keys %$joins )
-    {
+    while ( my @list =
+        grep !$processed{ $_ }
+            && (!$joins->{ $_ }{'depends_on'} || $processed{ $joins->{ $_ }{'depends_on'} }),
+        keys %$joins
+    ) {
         foreach my $join ( @list ) {
             $processed{ $join }++;
 
@@ -1230,9 +1232,10 @@ sub MayBeNull {
     };
 
     # solve boolean expression we have, an answer is our result
+    my $parens_count = 0;
     my @tmp = ();
     while ( defined ( my $e = shift @conditions ) ) {
-        #warn "@tmp >>>$e<<< @conditions";
+        #print "@tmp >>>$e<<< @conditions\n";
         return $e if !@conditions && !@tmp;
 
         unless ( $e ) {
@@ -1250,7 +1253,7 @@ sub MayBeNull {
                 my $close_p = $closing_paren->(0);
                 splice @conditions, 0, $close_p + 1, (0);
             } else {
-                die "lost @tmp >>>$e $aggreg<<< @conditions";
+                die "unknown aggregator: @tmp $e >>>$aggreg<<< @conditions";
             }
         } elsif ( $e eq '1' ) {
             if ( $conditions[0] eq ')' ) {
@@ -1267,15 +1270,19 @@ sub MayBeNull {
                 # 1 AND x == x
                 next;
             } else {
-                die "lost @tmp >>>$e $aggreg<<< @conditions";
+                die "unknown aggregator: @tmp $e >>>$aggreg<<< @conditions";
             }
         } elsif ( $e eq '(' ) {
             if ( $conditions[1] eq ')' ) {
                 splice @conditions, 1, 1;
             } else {
+                $parens_count++;
                 push @tmp, $e;
             }
         } elsif ( $e eq ')' ) {
+            die "extra closing paren: @tmp >>>$e<<< @conditions"
+                if --$parens_count < 0;
+
             unshift @conditions, @tmp, $e;
             @tmp = ();
         } else {

@@ -38,10 +38,11 @@ my %_CACHES = ();
 
 sub _SetupCache {
     my ($self, $cache) = @_;
-    $_CACHES{$cache} = new Cache::Simple::TimedExpiry;
+    $_CACHES{$cache} = Cache::Simple::TimedExpiry->new();
     $_CACHES{$cache}->expire_after( $self->_CacheConfig->{'cache_for_sec'} );
     return $_CACHES{$cache};
 }
+
 
 =head2 FlushCache
 
@@ -62,20 +63,20 @@ Blow away this record type's key cache
 
 sub _FlushKeyCache {
     my $self = shift;
-    my $cache = $self->_Handle->DSN . "-KEYS--" . ($self->{'_Class'} ||= ref $self);
+    my $cache = ($self->{_class}||= ref($self))."-KEYS";
     return $self->_SetupCache($cache);
 }
 
 sub _KeyCache {
     my $self = shift;
-    my $cache = $self->_Handle->DSN . "-KEYS--" . ($self->{'_Class'} ||= ref $self);
-    return $_CACHES{$cache}? $_CACHES{$cache}: $self->_SetupCache($cache);
+    my $cache = ($self->{_class}||= ref($self))."-KEYS";
+    return $_CACHES{$cache} || $self->_SetupCache($cache);
 }
 
 sub _RecordCache {
     my $self = shift;
-    my $cache = $self->_Handle->DSN . "--" . ($self->{'_Class'} ||= ref $self);
-    return $_CACHES{$cache}? $_CACHES{$cache}: $self->_SetupCache($cache);
+    my $cache = ($self->{_class}||= ref($self));
+    return $_CACHES{$cache} || $self->_SetupCache($cache);
 }
 
 # Function: LoadFromHash
