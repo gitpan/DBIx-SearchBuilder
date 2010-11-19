@@ -4,7 +4,7 @@ package DBIx::SearchBuilder;
 use strict;
 use warnings;
 
-our $VERSION = "1.58";
+our $VERSION = "1.59";
 
 use Clone qw();
 use Encode qw();
@@ -572,6 +572,59 @@ sub Last {
     my $self = shift;
     $self->GotoItem( ( $self->Count ) - 1 );
     return ( $self->Next );
+}
+
+=head2 DistinctFieldValues
+
+Returns list with distinct values of field. Limits on collection
+are accounted, so collection should be L</UnLimit>ed to get values
+from the whole table.
+
+Takes paramhash with the following keys:
+
+=over 4
+
+=item Field
+
+Field name. Can be first argument without key.
+
+=item Order
+
+'ASC', 'DESC' or undef. Defines whether results should
+be sorted or not. By default results are not sorted.
+
+=item Max
+
+Maximum number of elements to fetch.
+
+=back
+
+=cut
+
+sub DistinctFieldValues {
+    my $self = shift;
+    my %args = (
+        Field  => undef,
+        Order  => undef,
+        Max    => undef,
+        @_%2 ? (Field => @_) : (@_)
+    );
+
+    my $query_string = $self->_BuildJoins;
+    $query_string .= ' '. $self->_WhereClause
+        if $self->_isLimited > 0;
+
+    my $column = 'main.'. $args{'Field'};
+    $query_string = 'SELECT DISTINCT '. $column .' FROM '. $query_string;
+
+    if ( $args{'Order'} ) {
+        $query_string .= ' ORDER BY '. $column
+            .' '. ($args{'Order'} =~ /^des/i ? 'DESC' : 'ASC');
+    }
+
+    my $dbh = $self->_Handle->dbh;
+    my $list = $dbh->selectcol_arrayref( $query_string, { MaxRows => $args{'Max'} } );
+    return $list? @$list : ();
 }
 
 
