@@ -4,7 +4,7 @@ package DBIx::SearchBuilder;
 use strict;
 use warnings;
 
-our $VERSION = "1.59";
+our $VERSION = "1.59_01";
 
 use Clone qw();
 use Encode qw();
@@ -841,11 +841,7 @@ sub Limit {
         # we're doing an IS or IS NOT (null), don't quote the operator.
 
         if ( $args{'QUOTEVALUE'} && $args{'OPERATOR'} !~ /IS/i ) {
-            my $turn_utf = Encode::is_utf8( $args{'VALUE'} );
             $args{'VALUE'} = $self->_Handle->dbh->quote( $args{'VALUE'} );
-
-            # Accomodate DBI drivers that don't understand UTF8
-            Encode::_utf8_on( $args{'VALUE'} ) if $turn_utf;
         }
     }
 
@@ -1501,13 +1497,66 @@ sub IsLast {
 }
 
 
-=head2 Column { FIELD => undef } 
+=head2 Column
 
-Specify that we want to load the column  FIELD. 
+Call to specify which columns should be loaded from the table. Each
+calls adds one column to the set.  Takes a hash with the following named
+arguments:
 
-Other parameters are TABLE ALIAS AND FUNCTION.
+=over 4
 
-Autrijus and Ruslan owe docs.
+=item FIELD
+
+Column name to fetch or apply function to.  This can be omitted if a
+FUNCTION is given which is not a function of a field.
+
+=item ALIAS
+
+Alias of a table the field is in; defaults to C<main>
+
+=item FUNCTION
+
+A SQL function that should be selected as the result.  If a FIELD is
+provided, then it is inserted into the function according to the
+following rules:
+
+=over 4
+
+=item *
+
+If the text of the function contains a '?' (question mark), then it is
+replaced with qualified FIELD.
+
+=item *
+
+If the text of the function has no '(' (opening parenthesis), then the
+qualified FIELD is appended in parentheses to the text.
+
+=item *
+
+Otherwise, the function is inserted verbatim, with no substitution.
+
+=back
+
+=back
+
+If a FIELD is provided and it is in this table (ALIAS is 'main'), then
+the column named FIELD and can be accessed as usual by accessors:
+
+    $articles->Column(FIELD => 'id');
+    $articles->Column(FIELD => 'Subject', FUNCTION => 'SUBSTR(?, 1, 20)');
+    my $article = $articles->First;
+    my $aid = $article->id;
+    my $subject_prefix = $article->Subject;
+
+Returns the alias used for the column. If FIELD was not provided, or was
+from another table, then the returned column alias should be passed to
+the L<DBIx::SearchBuilder::Record/_Value> method to retrieve the
+column's result:
+
+    my $time_alias = $articles->Column(FUNCTION => 'NOW()');
+    my $article = $articles->First;
+    my $now = $article->_Value( $time_alias );
 
 =cut
 
@@ -1519,24 +1568,19 @@ sub Column {
                FUNCTION => undef,
                @_);
 
-    my $table = $args{TABLE} || do {
-        if ( my $alias = $args{ALIAS} ) {
-            $alias =~ s/_\d+$//;
-            $alias;
-        }
-        else {
-            $self->Table;
-        }
-    };
+    $args{'ALIAS'} ||= 'main';
 
-    my $name = ( $args{ALIAS} || 'main' ) . '.' . $args{FIELD};
-    if ( my $func = $args{FUNCTION} ) {
+    my $name;
+    if ( $args{FIELD} && $args{FUNCTION} ) {
+        $name = $args{'ALIAS'} .'.'. $args{'FIELD'};
+
+        my $func = $args{FUNCTION};
         if ( $func =~ /^DISTINCT\s*COUNT$/i ) {
             $name = "COUNT(DISTINCT $name)";
         }
         # If we want to substitute 
-        elsif ($func =~ /\?/) {
-            $name = join($name,split(/\?/,$func));
+        elsif ($func =~ s/\?/$name/g) {
+            $name = $func;
         }
         # If we want to call a simple function on the column
         elsif ($func !~ /\(/)  {
@@ -1544,12 +1588,36 @@ sub Column {
         } else {
             $name = $func;
         }
-        
+    }
+    elsif ( $args{FUNCTION} ) {
+        $name = $args{FUNCTION};
+    }
+    elsif ( $args{FIELD} ) {
+        $name = $args{'ALIAS'} .'.'. $args{'FIELD'};
+    }
+    else {
+        $name = 'NULL';
     }
 
-    my $column = "col" . @{ $self->{columns} ||= [] };
-    $column = $args{FIELD} if $table eq $self->Table and !$args{ALIAS};
-    push @{ $self->{columns} }, "$name AS \L$column";
+    my $column;
+    if (
+        $args{FIELD} && $args{ALIAS} eq 'main'
+        && (!$args{'TABLE'} || $args{'TABLE'} eq $self->Table )
+    ) {
+        $column = $args{FIELD};
+
+        # make sure we don't fetch columns with duplicate aliases
+        if ( $self->{columns} ) {
+            my $suffix = " AS \L$column";
+            if ( grep index($_, $suffix, -length $suffix) >= 0, @{ $self->{columns} } ) {
+                $column .= scalar @{ $self->{columns} };
+            }
+        }
+    }
+    else {
+        $column = "col" . @{ $self->{columns} ||= [] };
+    }
+    push @{ $self->{columns} ||= [] }, "$name AS \L$column";
     return $column;
 }
 

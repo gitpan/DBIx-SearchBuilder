@@ -53,6 +53,51 @@ sub Connect  {
     return ($rv); 
 }
 
+=head2 BuildDSN
+
+Customized version of L<DBIx::SearchBuilder::Handle/BuildDSN> method.
+
+Takes additional argument SID. Database argument used unless SID provided.
+Two forms of DSN are generated depending on whether Host defined or not:
+
+    dbi:Oracle:sid=<SID>;host=...[;port=...]
+    dbi:Oracle:<SID>
+
+Read details in documentation for L<DBD::Oracle> module.
+
+=cut
+
+sub BuildDSN {
+    my $self = shift;
+    my %args = (
+        Driver     => undef,
+        Database   => undef,
+        Host       => undef,
+        Port       => undef,
+        SID        => undef,
+        @_
+    );
+    $args{'Driver'} ||= 'Oracle';
+
+# read DBD::Oracle for details, but basicly it supports
+# either 'dbi:Oracle:SID' or 'dbi:Oracle:sid=SID;host=...;[port=...;]'
+# and tests shows that 'dbi:Oracle:SID' != 'dbi:Oracle:sid=SID'
+
+    $args{'SID'} ||= $args{'Database'};
+    my $dsn = "dbi:$args{'Driver'}:";
+    if ( $args{'Host'} ) {
+        $dsn .= "sid=$args{'SID'}"    if $args{'SID'};
+        $dsn .= ";host=$args{'Host'}";
+        $dsn .= ";port=$args{'Port'}" if $args{'Port'};
+    }
+    else {
+        $dsn .= $args{'SID'} if $args{'SID'};
+        $dsn .= ";port=$args{'Port'}" if $args{'Port'};
+    }
+
+    return $self->{'dsn'} = $dsn;
+}
+
 
 =head2 Insert
 
@@ -116,45 +161,6 @@ sub Insert  {
     $self->{'id'} = $unique_id;
     return( $self->{'id'}); #Add Succeded. return the id
   }
-
-
-
-=head2  BuildDSN PARAMHASH
-
-Takes a bunch of parameters:  
-
-Required: Driver, Database or Host/SID,
-Optional: Port and RequireSSL
-
-Builds a DSN suitable for an Oracle DBI connection
-
-=cut
-
-sub BuildDSN {
-    my $self = shift;
-  my %args = ( Driver => undef,
-	       Database => undef,
-	       Host => undef,
-	       Port => undef,
-           SID => undef,
-	       RequireSSL => undef,
-	       @_);
-  
-  my $dsn = "dbi:$args{'Driver'}:";
-
-  if (defined $args{'Host'} && $args{'Host'} 
-   && defined $args{'SID'}  && $args{'SID'} ) {
-      $dsn .= "host=$args{'Host'};sid=$args{'SID'}";
-  } else {
-      $dsn .= "$args{'Database'}" if (defined $args{'Database'} && $args{'Database'});
-  }
-  $dsn .= ";port=$args{'Port'}" if (defined $args{'Port'} && $args{'Port'});
-  $dsn .= ";requiressl=1" if (defined $args{'RequireSSL'} && $args{'RequireSSL'});
-
-  $self->{'dsn'}= $dsn;
-}
-
-
 
 =head2 KnowsBLOBs     
 
