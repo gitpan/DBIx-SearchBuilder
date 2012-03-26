@@ -357,7 +357,7 @@ Splits the key value pairs, constructs an INSERT statement
 and returns query string and set of bind values.
 
 This method is more useful for subclassing in DB specific
-handles. L</Insert> method is prefered for end users.
+handles. L</Insert> method is preferred for end users.
 
 =cut
 
@@ -502,7 +502,7 @@ sub SimpleUpdateFromSelect {
     my $full_query = "UPDATE $table SET ";
     $full_query .= join ', ', map "$_ = ?", @columns;
     $full_query .= ' WHERE id IN ('. $query .')';
-    my $sth = $self->SimpleQuery( $full_query, @binds );
+    my $sth = $self->SimpleQuery( $full_query, @binds, @query_binds );
     return $sth unless $sth;
 
     my $rows = $sth->rows;
