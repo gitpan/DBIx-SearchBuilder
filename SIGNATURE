@@ -17,8 +17,8 @@ Hash: SHA1
 SHA1 312bb7b5c24257f55575daeaa6f9cc22cd60f734 .gitignore
 SHA1 06e6bb2844c2ff6f961fc4810c6f41a31a003f8a Changes
 SHA1 db96fa6342b9c945275b135aa6377b8c612ee028 MANIFEST
-SHA1 c741d0b27470736403d54a5c6249e1a8b7d15d61 META.yml
-SHA1 70e01b4bbd8acc02b399160d5ec023a1606e862e Makefile.PL
+SHA1 924e91c12828568cc57ac4af860e2fbcc8db4d05 META.yml
+SHA1 056f491c3b2648fb93e1d21e311135362c5fd5ef Makefile.PL
 SHA1 d7a41642c368f2a587587e09f9e815d434feebff README
 SHA1 5a53d12d5cccd94845a6a7cc105cd9be34e20f1c ROADMAP
 SHA1 e7c7c7c91025072d25da78c93cefa2bc0aaf2b35 ex/Example/Model/Address.pm
@@ -35,8 +35,8 @@ SHA1 b62ca5e2d58fa66766ccf4d64574f9e1a2250b34 inc/Module/Install/Makefile.pm
 SHA1 1aa925be410bb3bfcd84a16985921f66073cc1d2 inc/Module/Install/Metadata.pm
 SHA1 e4196994fa75e98bdfa2be0bdeeffef66de88171 inc/Module/Install/Win32.pm
 SHA1 c3a6d0d5b84feb3280622e9599e86247d58b0d18 inc/Module/Install/WriteAll.pm
-SHA1 c7b8a88881dbf27775720777c514533a86c5a892 lib/DBIx/SearchBuilder.pm
-SHA1 3c8efc426e2936138c4b411f7f1a39c9f15ad845 lib/DBIx/SearchBuilder/Handle.pm
+SHA1 0f759c4a1434fff26f5d2e14553aa3b919f6ad7d lib/DBIx/SearchBuilder.pm
+SHA1 f0d2ff1dc2cd49b65410dd84c2bb9d68d703c481 lib/DBIx/SearchBuilder/Handle.pm
 SHA1 55d337e6dd1ab5aecc39d2ae491bffb12e9ca449 lib/DBIx/SearchBuilder/Handle/Informix.pm
 SHA1 4efdcaefa5f94d994b052d1b343d2f5164ef4b52 lib/DBIx/SearchBuilder/Handle/ODBC.pm
 SHA1 18f621fc6c2e16d7a5b8576487924107d4725968 lib/DBIx/SearchBuilder/Handle/Oracle.pm
@@ -73,9 +73,9 @@ SHA1 e9c6a5881fc60173fbc8d479c1afd2ce3b43bef1 t/pod.t
 SHA1 afd320ea000cbe83b08691cc37bea45da20002d3 t/testmodels.pl
 SHA1 ceb2fad4e6973b7b30f0e83abc14cfb80ac93efe t/utils.pl
 -----BEGIN PGP SIGNATURE-----
-Version: GnuPG v1.4.11 (Darwin)
+Version: GnuPG v1.4.11 (GNU/Linux)
 
-iEYEARECAAYFAk9wN50ACgkQvH6dkeDZaS/huwCfZCHeFQpfOFCYmwo57wNmHwgc
-BRoAn3Tp6zQsXyu6yZaCRjONO7Mpr6F0
-=zQAk
+iD8DBQFQUk88Hdv9ZfNcOAcRAjl6AJ9QyCP2wlhnQ73RINp2sHFkd4dzvgCcC+xe
+YBtYS46lQ7ANyyb897B00Tk=
+=b2md
 -----END PGP SIGNATURE-----
