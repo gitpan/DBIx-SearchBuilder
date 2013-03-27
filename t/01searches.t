@@ -7,7 +7,7 @@ use Test::More;
 BEGIN { require "t/utils.pl" }
 our (@AvailableDrivers);
 
-use constant TESTS_PER_DRIVER => 117;
+use constant TESTS_PER_DRIVER => 144;
 
 my $total = scalar(@AvailableDrivers) * TESTS_PER_DRIVER;
 plan tests => $total;
@@ -167,6 +167,67 @@ SKIP: {
 	$users_obj->Limit( FIELD => 'Phone', OPERATOR => 'IS NOT', VALUE => 'NULL', QOUTEVALUE => 0 );
 	is( $users_obj->Count, $count_all - 2, "found users who has phone number filled" );
 
+	# IN [...] operator
+	$users_obj->CleanSlate;
+	is_deeply( $users_obj, $clean_obj, 'after CleanSlate looks like new object');
+	$users_obj->Limit( FIELD => 'Login', OPERATOR => 'IN', VALUE => ['obra', 'cubic'] );
+	is( $users_obj->Count, 2, "found two users using IN operator" );
+	is_deeply(
+        [ sort map $_->Login, @{ $users_obj->ItemsArrayRef } ],
+        [ 'cubic', 'obra' ],
+        'found correct records',
+    );
+	$users_obj->CleanSlate;
+	$users_obj->Limit( FIELD => 'Login', OPERATOR => 'NOT IN', VALUE => ['obra', 'cubic'] );
+	is( $users_obj->Count, 2, "found two users using NOT IN operator" );
+	is_deeply(
+        [ sort map $_->Login, @{ $users_obj->ItemsArrayRef } ],
+        [ 'autrijus', 'glasser' ],
+        'found correct records',
+    );
+
+	# IN $collection operator
+	$users_obj->CleanSlate;
+	is_deeply( $users_obj, $clean_obj, 'after CleanSlate looks like new object');
+    {
+        my $tmp = $users_obj->Clone;
+        $tmp->Limit( FIELD => 'Login', OPERATOR => 'IN', VALUE => ['obra', 'cubic'] );
+        $users_obj->Limit( FIELD => 'id', OPERATOR => 'IN', VALUE => $tmp );
+    }
+	is( $users_obj->Count, 2, "found two users using IN operator" );
+	is_deeply(
+        [ sort map $_->Login, @{ $users_obj->ItemsArrayRef } ],
+        [ 'cubic', 'obra' ],
+        'found correct records',
+    );
+	$users_obj->CleanSlate;
+    {
+        my $tmp = $users_obj->Clone;
+        $tmp->Limit( FIELD => 'Login', OPERATOR => 'IN', VALUE => ['obra', 'cubic'] );
+        $users_obj->Limit( FIELD => 'id', OPERATOR => 'NOT IN', VALUE => $tmp );
+    }
+	is( $users_obj->Count, 2, "found two users using IN operator" );
+	is_deeply(
+        [ sort map $_->Login, @{ $users_obj->ItemsArrayRef } ],
+        [ 'autrijus', 'glasser' ],
+        'found correct records',
+    );
+	# IN with object and Column preselected
+	$users_obj->CleanSlate;
+	is_deeply( $users_obj, $clean_obj, 'after CleanSlate looks like new object');
+    {
+        my $tmp = $users_obj->Clone;
+        $tmp->Limit( FIELD => 'Login', OPERATOR => 'IN', VALUE => ['obra', 'cubic'] );
+        $tmp->Column(FIELD => 'Login');
+        $users_obj->Limit( FIELD => 'Login', OPERATOR => 'IN', VALUE => $tmp );
+    }
+	is( $users_obj->Count, 2, "found two users using IN operator" );
+	is_deeply(
+        [ sort map $_->Login, @{ $users_obj->ItemsArrayRef } ],
+        [ 'cubic', 'obra' ],
+        'found correct records',
+    );
+
 	# ORDER BY / GROUP BY
 	$users_obj->CleanSlate;
 	is_deeply( $users_obj, $clean_obj, 'after CleanSlate looks like new object');
@@ -325,6 +386,32 @@ SKIP: {
         is ( $u->_Value($id_alias), $u->id, "fetched with '?' function" );
     }
 
+    $users_obj = TestApp::Users->new( $handle );
+    $users_obj->UnLimit;
+    {
+        is( $users_obj->Column(FIELD => 'id'), "id" );
+        is( my $id_alias = $users_obj->Column(FIELD => 'id', AS => 'foo'), "foo" );
+        my $u = $users_obj->Next;
+        is( $u->_Value($id_alias), $u->id, "fetched id with custom alias" );
+    }
+
+    $users_obj = TestApp::Users->new( $handle );
+    $users_obj->UnLimit;
+    {
+        is( $users_obj->Column(FUNCTION => "main.*", AS => undef), undef );
+        my $u = $users_obj->Next;
+        ok $u->{fetched}{"\L$_"}, "fetched field $_" for keys %{$u->_ClassAccessible};
+    }
+
+    $users_obj = TestApp::Users->new( $handle );
+    $users_obj->UnLimit;
+    {
+        is( my $id_alias = $users_obj->AdditionalColumn(FIELD => 'id', AS => 'foo'), "foo" );
+        my $u = $users_obj->Next;
+        is( $u->_Value($id_alias), $u->id, "fetched id with custom alias" );
+        ok $u->{fetched}{"\L$_"}, "fetched normal field $_" for keys %{$u->_ClassAccessible};
+    }
+
 	cleanup_schema( 'TestApp', $handle );
 }} # SKIP, foreach blocks
 
@@ -332,17 +419,20 @@ SKIP: {
 
 package TestApp;
 
-sub schema_mysql {
-<<EOF;
-CREATE TEMPORARY TABLE Users (
+sub schema_mysql {[
+	"DROP TABLE IF EXISTS Users",
+<<EOF
+CREATE TABLE Users (
         id integer AUTO_INCREMENT,
         Login varchar(18) NOT NULL,
         Name varchar(36),
 	Phone varchar(18),
   	PRIMARY KEY (id))
 EOF
-
-}
+]}
+sub cleanup_schema_mysql { [
+    "DROP TABLE Users", 
+] }
 
 sub schema_pg {
 <<EOF;
