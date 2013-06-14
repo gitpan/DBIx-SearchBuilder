@@ -11,7 +11,7 @@ use Encode qw();
 
 use DBIx::SearchBuilder::Util qw/ sorted_values /;
 
-use vars qw(@ISA %DBIHandle $PrevHandle $DEBUG %TRANSDEPTH %FIELDS_IN_TABLE);
+use vars qw(@ISA %DBIHandle $PrevHandle $DEBUG %TRANSDEPTH %TRANSROLLBACK %FIELDS_IN_TABLE);
 
 
 =head1 NAME
@@ -841,15 +841,23 @@ sub EndTransaction {
     $depth = 0 if $args{'Force'};
 
     $self->TransactionDepth( $depth );
+
+    my $dbh = $self->dbh;
+    $TRANSROLLBACK{ $dbh }{ $action }++;
+    if ( $TRANSROLLBACK{ $dbh }{ $action eq 'commit'? 'rollback' : 'commit' } ) {
+        warn "Rollback and commit are mixed while escaping nested transaction";
+    }
     return 1 if $depth;
 
+    delete $TRANSROLLBACK{ $dbh };
+
     if ($action eq 'commit') {
-        return $self->dbh->commit;
+        return $dbh->commit;
     }
     else {
         DBIx::SearchBuilder::Record::Cachable->FlushCache
             if DBIx::SearchBuilder::Record::Cachable->can('FlushCache');
-        return $self->dbh->rollback;
+        return $dbh->rollback;
     }
 }
 
@@ -1024,6 +1032,9 @@ sub Join {
                 }
             }
 
+        } else {
+            # we found alias, so NewAlias should take care of distinctness
+            $args{'DISTINCT'} = 1 unless exists $args{'DISTINCT'};
         }
 
         unless ( $alias ) {
@@ -1078,6 +1089,12 @@ sub Join {
     my $criterion = $args{'EXPRESSION'} || $args{'ALIAS1'}.".".$args{'FIELD1'};
     $meta->{'criteria'}{'base_criterion'} =
         [ { field => "$alias.$args{'FIELD2'}", op => '=', value => $criterion } ];
+
+    if ( $args{'DISTINCT'} && !defined $args{'SearchBuilder'}{'joins_are_distinct'} ) {
+        $args{SearchBuilder}{joins_are_distinct} = 1;
+    } elsif ( !$args{'DISTINCT'} ) {
+        $args{SearchBuilder}{joins_are_distinct} = 0;
+    }
 
     return ($alias);
 }
@@ -1617,13 +1634,94 @@ sub DateTimeIntervalFunction {
 
 sub _DateTimeIntervalFunction { return 'NULL' }
 
+=head2 NullsOrder
+
+Sets order of NULLs when sorting columns when called with mode,
+but only if DB supports it. Modes:
+
+=over 4
+
+=item * small
+
+NULLs are smaller then anything else, so come first when order
+is ASC and last otherwise.
+
+=item * large
+
+NULLs are larger then anything else.
+
+=item * first
+
+NULLs are always first.
+
+=item * last
+
+NULLs are always last.
+
+=item * default
+
+Return back to DB's default behaviour.
+
+=back
+
+When called without argument returns metadata required to generate
+SQL.
+
+=cut
+
+sub NullsOrder {
+    my $self = shift;
+
+    unless ($self->HasSupportForNullsOrder) {
+        warn "No support for changing NULLs order" if @_;
+        return undef;
+    }
+
+    if ( @_ ) {
+        my $mode = shift || 'default';
+        if ( $mode eq 'default' ) {
+            delete $self->{'nulls_order'};
+        }
+        elsif ( $mode eq 'small' ) {
+            $self->{'nulls_order'} = { ASC => 'NULLS FIRST', DESC => 'NULLS LAST' };
+        }
+        elsif ( $mode eq 'large' ) {
+            $self->{'nulls_order'} = { ASC => 'NULLS LAST', DESC => 'NULLS FIRST' };
+        }
+        elsif ( $mode eq 'first' ) {
+            $self->{'nulls_order'} = { ASC => 'NULLS FIRST', DESC => 'NULLS FIRST' };
+        }
+        elsif ( $mode eq 'last' ) {
+            $self->{'nulls_order'} = { ASC => 'NULLS LAST', DESC => 'NULLS LAST' };
+        }
+        else {
+            warn "'$mode' is not supported NULLs ordering mode";
+            delete $self->{'nulls_order'};
+        }
+    }
+
+    return undef unless $self->{'nulls_order'};
+    return $self->{'nulls_order'};
+}
+
+=head2 HasSupportForNullsOrder
+
+Returns true value if DB supports adjusting NULLs order while sorting
+a column, for example C<ORDER BY Value ASC NULLS FIRST>.
+
+=cut
+
+sub HasSupportForNullsOrder {
+    return 0;
+}
+
+
 =head2 DESTROY
 
 When we get rid of the Searchbuilder::Handle, we need to disconnect from the database
 
 =cut
 
-  
 sub DESTROY {
   my $self = shift;
   $self->Disconnect if $self->{'DisconnectHandleOnDestroy'};

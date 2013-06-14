@@ -1,5 +1,5 @@
 This file contains message digests of all files listed in MANIFEST,
-signed via the Module::Signature module, version 0.70.
+signed via the Module::Signature module, version 0.69.
 
 To verify the content in this distribution, first make sure you have
 Module::Signature installed, then type:
@@ -15,9 +15,9 @@ not run its Makefile.PL or Build.PL.
 Hash: SHA1
 
 SHA1 312bb7b5c24257f55575daeaa6f9cc22cd60f734 .gitignore
-SHA1 24a2e7dbeb969dc265eb8b6c94ce5528b87e7460 Changes
-SHA1 7088270ecd4a7a0be3b370aac63eaf770e16f552 MANIFEST
-SHA1 bacbe6c1af97748e57ecadf43c8efc83314b2e5d META.yml
+SHA1 002a71236a87f5bff4aaddd6ad8b2b3c92a37c20 Changes
+SHA1 f9526289f15de085cbe55ce253b5964856fc3092 MANIFEST
+SHA1 636d4117b344fb31320257120e17feb22ef78e14 META.yml
 SHA1 879332930c43934dc2ead7ad8668c0ab190c9f29 Makefile.PL
 SHA1 d7a41642c368f2a587587e09f9e815d434feebff README
 SHA1 5a53d12d5cccd94845a6a7cc105cd9be34e20f1c ROADMAP
@@ -35,12 +35,12 @@ SHA1 b62ca5e2d58fa66766ccf4d64574f9e1a2250b34 inc/Module/Install/Makefile.pm
 SHA1 1aa925be410bb3bfcd84a16985921f66073cc1d2 inc/Module/Install/Metadata.pm
 SHA1 e4196994fa75e98bdfa2be0bdeeffef66de88171 inc/Module/Install/Win32.pm
 SHA1 c3a6d0d5b84feb3280622e9599e86247d58b0d18 inc/Module/Install/WriteAll.pm
-SHA1 147c5724fc89bd0ca0114ce9e711addb29f726da lib/DBIx/SearchBuilder.pm
-SHA1 52abec18ac30adff99cb8f2a45c61e1aecdba626 lib/DBIx/SearchBuilder/Handle.pm
+SHA1 22ad01f385129c7a5006b782f567f558f988cf6d lib/DBIx/SearchBuilder.pm
+SHA1 6a7c90aeae63ba9584ac7f15fb3340a41c5d4325 lib/DBIx/SearchBuilder/Handle.pm
 SHA1 55d337e6dd1ab5aecc39d2ae491bffb12e9ca449 lib/DBIx/SearchBuilder/Handle/Informix.pm
 SHA1 4efdcaefa5f94d994b052d1b343d2f5164ef4b52 lib/DBIx/SearchBuilder/Handle/ODBC.pm
-SHA1 f41814b7ac80e505dc08d8bdadfd3530053d0a1e lib/DBIx/SearchBuilder/Handle/Oracle.pm
-SHA1 36c9f7c8fee56c7c1c1f37554ac27551ca4bb3ce lib/DBIx/SearchBuilder/Handle/Pg.pm
+SHA1 5effbaa557cce330503f117dd6c02f5a8fc1b01e lib/DBIx/SearchBuilder/Handle/Oracle.pm
+SHA1 29fc690c1957b00b2538bce933ba5c8b45e02936 lib/DBIx/SearchBuilder/Handle/Pg.pm
 SHA1 ebeef91ec5d215b02aa10d8e990a92f4d38bbe52 lib/DBIx/SearchBuilder/Handle/SQLite.pm
 SHA1 ec3fbc03b27c008d93a52b6b7fb0076529e5fcc8 lib/DBIx/SearchBuilder/Handle/Sybase.pm
 SHA1 3e7a6e7dd00dc59f9948288eb8235782ac2cd668 lib/DBIx/SearchBuilder/Handle/mysql.pm
@@ -55,20 +55,21 @@ SHA1 b7c82b550346f85678591966871bd47d6775bb70 t/00.load.t
 SHA1 a7ed1ee359ebe2842b354b5652a441403e802080 t/01basics.t
 SHA1 2b2dc6f72370f60e1d233f2f8c12bb87414e825c t/01nocap_api.t
 SHA1 09eb7ae878b679b38626e658ddebfd585825fdd4 t/01records.t
-SHA1 e59867165bd9055b6e439e731e4adad0dfc0bfd1 t/01searches.t
+SHA1 538891efe9f14014af62f6df441a7374aa8728b9 t/01searches.t
 SHA1 764771341b46b2da833ee2ddaa5c4d3191619e89 t/02distinct_values.t
+SHA1 3296f220370bb1bdb2ede3b0cfde9bed4e424f41 t/02null_order.t
 SHA1 af1f5d616e935cd955c2fb55c9595c8d35a3922c t/02order_outer.t
 SHA1 67d4c0dca9d1914eadba64460f3a2da4e074ae14 t/02records_cachable.t
-SHA1 f4ef4abcab341b22782b0ca88eb69f276de861fa t/02records_datetime.t
+SHA1 446b8bab966c6456728caf0da4beb18c5cb0b835 t/02records_datetime.t
 SHA1 c6113df6263611cb1131ea9150e2ae9798e30958 t/02records_dt_interval.t
 SHA1 79ed9cd53a3851e87485d20b4803e8d4eaf21e48 t/02records_integers.t
 SHA1 6e50e77f1b54fe28fd6bcbb6eb104527f25d2601 t/02records_object.t
 SHA1 fb66ba9438525ae513f16187fa346ed881f30046 t/02searches_function.t
-SHA1 1398226c92dac259a3178e273b6674e45df8225e t/02searches_joins.t
+SHA1 0838f9f0eef014ce70d9b4e6ede4ec50e32c83f6 t/02searches_joins.t
 SHA1 277100711a9adc634e2db7bc3701c7a927d689dc t/03compatibility.t
 SHA1 0402ef7097febffa2fa0d9afda56fbca122e49f9 t/03cud_from_select.t
 SHA1 fdc1ebd0353a4483f9a64a1b6558fd8c22b6a0e4 t/03rebless.t
-SHA1 bb7a83e06b9a7fe71c2707e81821f0f82bde1829 t/03transactions.t
+SHA1 81623a2abb738d1bc9b5a77355e0955dde401086 t/03transactions.t
 SHA1 1fe8ef579aa7e503f3227d42674c2218e4400ab5 t/03versions.t
 SHA1 f8f5634e7dc28068722347f47d7e05d06435e22c t/10schema.t
 SHA1 b22ee88495de953e688cda8d0959511864aa936b t/11schema_records.t
@@ -77,9 +78,9 @@ SHA1 e9c6a5881fc60173fbc8d479c1afd2ce3b43bef1 t/pod.t
 SHA1 afd320ea000cbe83b08691cc37bea45da20002d3 t/testmodels.pl
 SHA1 ceb2fad4e6973b7b30f0e83abc14cfb80ac93efe t/utils.pl
 -----BEGIN PGP SIGNATURE-----
-Version: GnuPG v1.4.13 (Darwin)
+Version: GnuPG v1.4.11 (GNU/Linux)
 
-iEYEARECAAYFAlFutkQACgkQvH6dkeDZaS/4cQCfQfqjAbdkgfPv6eWgsiIwaIRA
-3LAAnjBLDqGoImfDSxOA5w+50sK+RsaN
-=Juil
+iD8DBQFRu3lwHdv9ZfNcOAcRAmSdAJ9LDf/W4HfRZm2TRZ5xcqS4lZY3ZgCfQkkZ
+HwePCLryI0PQYRdghlbn9ZQ=
+=Bkua
 -----END PGP SIGNATURE-----

@@ -4,7 +4,7 @@ package DBIx::SearchBuilder;
 use strict;
 use warnings;
 
-our $VERSION = "1.63_02";
+our $VERSION = "1.63_03";
 
 use Clone qw();
 use Encode qw();
@@ -136,7 +136,7 @@ sub CleanSlate {
     $self->{'first_row'}        = 0;
     $self->{'must_redo_search'} = 1;
     $self->{'show_rows'}        = 0;
-    $self->{'joins_are_distinct'} = 0;
+    $self->{'joins_are_distinct'} = undef;
     @{ $self->{'aliases'} } = ();
 
     delete $self->{$_} for qw(
@@ -232,8 +232,9 @@ sub _DoSearch {
 
     my $QueryString = $self->BuildSelectQuery();
 
-    # If we're about to redo the search, we need an empty set of items
+    # If we're about to redo the search, we need an empty set of items and a reset iterator
     delete $self->{'items'};
+    $self->{'itemscount'} = 0;
 
     my $records = $self->_Handle->SimpleQuery($QueryString);
     return 0 unless $records;
@@ -537,9 +538,13 @@ sub GotoFirstItem {
 
 =head2 GotoItem
 
-Takes an integer, n.
-Sets the record counter to n. the next time you call Next,
-you'll get the nth item.
+Takes an integer N and sets the record iterator to N.  The first time L</Next>
+is called afterwards, it will return the Nth item found by the search.
+
+You should only call GotoItem after you've already fetched at least one result
+or otherwise forced the search query to run (such as via L</ItemsArrayRef>).
+If GotoItem is called before the search query is ever run, it will reset the
+item iterator and L</Next> will return the L</First> item.
 
 =cut
 
@@ -573,6 +578,7 @@ Returns the last item
 
 sub Last {
     my $self = shift;
+    $self->_DoSearch if $self->{'must_redo_search'};
     $self->GotoItem( ( $self->Count ) - 1 );
     return ( $self->Next );
 }
@@ -1131,6 +1137,8 @@ sub _OrderClause {
 
     return '' unless $self->{'order_by'};
 
+    my $nulls_order = $self->_Handle->NullsOrder;
+
     my $clause = '';
     foreach my $row ( @{$self->{'order_by'}} ) {
 
@@ -1141,9 +1149,11 @@ sub _OrderClause {
 		      );
         if ($rowhash{'ORDER'} && $rowhash{'ORDER'} =~ /^des/i) {
 	    $rowhash{'ORDER'} = "DESC";
+            $rowhash{'ORDER'} .= ' '. $nulls_order->{'DESC'} if $nulls_order;
         }
         else {
 	    $rowhash{'ORDER'} = "ASC";
+            $rowhash{'ORDER'} .= ' '. $nulls_order->{'ASC'} if $nulls_order;
         }
         $rowhash{'ALIAS'} = 'main' unless defined $rowhash{'ALIAS'};
 
@@ -1208,7 +1218,17 @@ sub _GroupClause {
 
 =head2 NewAlias
 
-Takes the name of a table.
+Takes the name of a table and paramhash with TYPE and DISTINCT.
+
+Use TYPE equal to C<LEFT> to indicate that it's LEFT JOIN. Old
+style way to call (see below) is also supported, but should be
+B<avoided>:
+
+    $records->NewAlias('aTable', 'left');
+
+True DISTINCT value indicates that this join keeps result set
+distinct and DB side distinct is not required. See also L</Join>.
+
 Returns the string of a new Alias for that table, which can be used to Join tables
 or to Limit what gets found by a search.
 
@@ -1217,7 +1237,9 @@ or to Limit what gets found by a search.
 sub NewAlias {
     my $self  = shift;
     my $table = shift || die "Missing parameter";
-    my $type = shift;
+    my %args = @_%2? (TYPE => @_) : (@_);
+
+    my $type = $args{'TYPE'};
 
     my $alias = $self->_GetAlias($table);
 
@@ -1230,6 +1252,12 @@ sub NewAlias {
         $meta->{'depends_on'} = '';
     } else {
         die "Unsupported alias(join) type";
+    }
+
+    if ( $args{'DISTINCT'} && !defined $self->{'joins_are_distinct'} ) {
+        $self->{'joins_are_distinct'} = 1;
+    } elsif ( !$args{'DISTINCT'} ) {
+        $self->{'joins_are_distinct'} = 0;
     }
 
     return $alias;
@@ -1277,6 +1305,11 @@ ALIAS2/TABLE2 on an arbitrary expression.
 It is also possible to join to a pre-existing, already-limited
 L<DBIx::SearchBuilder> object, by passing it as COLLECTION2, instead
 of providing an ALIAS2 or TABLE2.
+
+By passing true value as DISTINCT argument join can be marked distinct. If
+all joins are distinct then whole query is distinct and SearchBuilder can
+avoid L</_DistinctQuery> call that can hurt performance of the query. See
+also L</NewAlias>.
 
 =cut
 
