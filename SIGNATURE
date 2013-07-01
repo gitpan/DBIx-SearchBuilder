@@ -15,9 +15,9 @@ not run its Makefile.PL or Build.PL.
 Hash: SHA1
 
 SHA1 312bb7b5c24257f55575daeaa6f9cc22cd60f734 .gitignore
-SHA1 002a71236a87f5bff4aaddd6ad8b2b3c92a37c20 Changes
+SHA1 43e713524615d786cedcec28ce35b5a0f50b4951 Changes
 SHA1 f9526289f15de085cbe55ce253b5964856fc3092 MANIFEST
-SHA1 636d4117b344fb31320257120e17feb22ef78e14 META.yml
+SHA1 76fa36abb440e98dfe69e7e36df607c4e478f51a META.yml
 SHA1 879332930c43934dc2ead7ad8668c0ab190c9f29 Makefile.PL
 SHA1 d7a41642c368f2a587587e09f9e815d434feebff README
 SHA1 5a53d12d5cccd94845a6a7cc105cd9be34e20f1c ROADMAP
@@ -35,7 +35,7 @@ SHA1 b62ca5e2d58fa66766ccf4d64574f9e1a2250b34 inc/Module/Install/Makefile.pm
 SHA1 1aa925be410bb3bfcd84a16985921f66073cc1d2 inc/Module/Install/Metadata.pm
 SHA1 e4196994fa75e98bdfa2be0bdeeffef66de88171 inc/Module/Install/Win32.pm
 SHA1 c3a6d0d5b84feb3280622e9599e86247d58b0d18 inc/Module/Install/WriteAll.pm
-SHA1 22ad01f385129c7a5006b782f567f558f988cf6d lib/DBIx/SearchBuilder.pm
+SHA1 67169a82747233afd9e6b924197ff2abce180090 lib/DBIx/SearchBuilder.pm
 SHA1 6a7c90aeae63ba9584ac7f15fb3340a41c5d4325 lib/DBIx/SearchBuilder/Handle.pm
 SHA1 55d337e6dd1ab5aecc39d2ae491bffb12e9ca449 lib/DBIx/SearchBuilder/Handle/Informix.pm
 SHA1 4efdcaefa5f94d994b052d1b343d2f5164ef4b52 lib/DBIx/SearchBuilder/Handle/ODBC.pm
@@ -80,7 +80,7 @@ SHA1 ceb2fad4e6973b7b30f0e83abc14cfb80ac93efe t/utils.pl
 -----BEGIN PGP SIGNATURE-----
 Version: GnuPG v1.4.11 (GNU/Linux)
 
-iD8DBQFRu3lwHdv9ZfNcOAcRAmSdAJ9LDf/W4HfRZm2TRZ5xcqS4lZY3ZgCfQkkZ
-HwePCLryI0PQYRdghlbn9ZQ=
-=Bkua
+iD8DBQFR0brrHdv9ZfNcOAcRAi/aAJ9QOrp7ebCGkcVZxAuzq5Q5VNuirACfVeuj
+l/t+X9Z65uqMVqnTlG6Ixjo=
+=CFx7
 -----END PGP SIGNATURE-----
