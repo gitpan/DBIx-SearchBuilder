@@ -15,9 +15,9 @@ not run its Makefile.PL or Build.PL.
 Hash: SHA1
 
 SHA1 312bb7b5c24257f55575daeaa6f9cc22cd60f734 .gitignore
-SHA1 43e713524615d786cedcec28ce35b5a0f50b4951 Changes
+SHA1 1a1bc4ff5520786b82ccc537ec795ca28088cad2 Changes
 SHA1 f9526289f15de085cbe55ce253b5964856fc3092 MANIFEST
-SHA1 76fa36abb440e98dfe69e7e36df607c4e478f51a META.yml
+SHA1 eddfdceb91ce00190de629547b994cfe467a857d META.yml
 SHA1 879332930c43934dc2ead7ad8668c0ab190c9f29 Makefile.PL
 SHA1 d7a41642c368f2a587587e09f9e815d434feebff README
 SHA1 5a53d12d5cccd94845a6a7cc105cd9be34e20f1c ROADMAP
@@ -35,12 +35,12 @@ SHA1 b62ca5e2d58fa66766ccf4d64574f9e1a2250b34 inc/Module/Install/Makefile.pm
 SHA1 1aa925be410bb3bfcd84a16985921f66073cc1d2 inc/Module/Install/Metadata.pm
 SHA1 e4196994fa75e98bdfa2be0bdeeffef66de88171 inc/Module/Install/Win32.pm
 SHA1 c3a6d0d5b84feb3280622e9599e86247d58b0d18 inc/Module/Install/WriteAll.pm
-SHA1 67169a82747233afd9e6b924197ff2abce180090 lib/DBIx/SearchBuilder.pm
+SHA1 7e63abf9aab1b74823a963acdb1ca3dffe2c3fc8 lib/DBIx/SearchBuilder.pm
 SHA1 6a7c90aeae63ba9584ac7f15fb3340a41c5d4325 lib/DBIx/SearchBuilder/Handle.pm
 SHA1 55d337e6dd1ab5aecc39d2ae491bffb12e9ca449 lib/DBIx/SearchBuilder/Handle/Informix.pm
 SHA1 4efdcaefa5f94d994b052d1b343d2f5164ef4b52 lib/DBIx/SearchBuilder/Handle/ODBC.pm
 SHA1 5effbaa557cce330503f117dd6c02f5a8fc1b01e lib/DBIx/SearchBuilder/Handle/Oracle.pm
-SHA1 29fc690c1957b00b2538bce933ba5c8b45e02936 lib/DBIx/SearchBuilder/Handle/Pg.pm
+SHA1 7926d63560821a7bc8c9634bc6135833fe741261 lib/DBIx/SearchBuilder/Handle/Pg.pm
 SHA1 ebeef91ec5d215b02aa10d8e990a92f4d38bbe52 lib/DBIx/SearchBuilder/Handle/SQLite.pm
 SHA1 ec3fbc03b27c008d93a52b6b7fb0076529e5fcc8 lib/DBIx/SearchBuilder/Handle/Sybase.pm
 SHA1 3e7a6e7dd00dc59f9948288eb8235782ac2cd668 lib/DBIx/SearchBuilder/Handle/mysql.pm
@@ -61,7 +61,7 @@ SHA1 3296f220370bb1bdb2ede3b0cfde9bed4e424f41 t/02null_order.t
 SHA1 af1f5d616e935cd955c2fb55c9595c8d35a3922c t/02order_outer.t
 SHA1 67d4c0dca9d1914eadba64460f3a2da4e074ae14 t/02records_cachable.t
 SHA1 446b8bab966c6456728caf0da4beb18c5cb0b835 t/02records_datetime.t
-SHA1 c6113df6263611cb1131ea9150e2ae9798e30958 t/02records_dt_interval.t
+SHA1 293dacc7cb7f39b9e48daea3b77f5dc325a84cbd t/02records_dt_interval.t
 SHA1 79ed9cd53a3851e87485d20b4803e8d4eaf21e48 t/02records_integers.t
 SHA1 6e50e77f1b54fe28fd6bcbb6eb104527f25d2601 t/02records_object.t
 SHA1 fb66ba9438525ae513f16187fa346ed881f30046 t/02searches_function.t
@@ -80,7 +80,7 @@ SHA1 ceb2fad4e6973b7b30f0e83abc14cfb80ac93efe t/utils.pl
 -----BEGIN PGP SIGNATURE-----
 Version: GnuPG v1.4.11 (GNU/Linux)
 
-iD8DBQFR0brrHdv9ZfNcOAcRAi/aAJ9QOrp7ebCGkcVZxAuzq5Q5VNuirACfVeuj
-l/t+X9Z65uqMVqnTlG6Ixjo=
-=CFx7
+iD8DBQFR1LcDHdv9ZfNcOAcRAlKFAJ9LpqrcM54lG4khRwxWE+PqxtkRJgCeOrsY
+IBOjrltkmFglYUuoZnXkLB0=
+=rgT2
 -----END PGP SIGNATURE-----
