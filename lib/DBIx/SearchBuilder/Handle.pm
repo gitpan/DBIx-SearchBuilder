@@ -574,9 +574,6 @@ sub SimpleQuery {
             delete $bhash->{'value'};
             $sth->bind_param( $bind_idx + 1, undef, $bhash );
         }
-        # Some databases, such as Oracle fail to cope if it's a perl utf8
-        # string. they desperately want bytes.
-         Encode::_utf8_off($bind_values[$bind_idx]);
     }
 
     my $basetime;
@@ -1436,7 +1433,7 @@ sub Fields {
             or return ();
         my $info = $sth->fetchall_arrayref({});
         foreach my $e ( @$info ) {
-            push @{ $FIELDS_IN_TABLE{ $table } }, lc $e->{'COLUMN_NAME'};
+            push @{ $FIELDS_IN_TABLE{ $table } }, $e->{'COLUMN_NAME'};
         }
     }
 
